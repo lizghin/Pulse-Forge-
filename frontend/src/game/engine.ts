@@ -1,6 +1,6 @@
-// Game engine - fixed timestep loop
+// Game engine - fixed timestep loop with Mastery tracking
 
-import { GameConfig, GameState, Player, Pickup, Hazard, Vector2 } from './types';
+import { GameConfig, Player, Pickup, Hazard } from './types';
 import { createPlayer, updatePlayer } from './systems/player';
 import { updatePickups, spawnPickup, checkPickupCollisions } from './systems/pickups';
 import { updateHazards, spawnHazards, checkHazardCollisions } from './systems/hazards';
@@ -15,6 +15,10 @@ export const DEFAULT_CONFIG: GameConfig = {
   fixedDeltaTime: 1000 / 60,
 };
 
+// Rhythm timing window (seconds between pulses for streak)
+const RHYTHM_WINDOW_MIN = 0.8;
+const RHYTHM_WINDOW_MAX = 1.5;
+
 export class GameEngine {
   private config: GameConfig;
   private lastTime: number = 0;
@@ -26,6 +30,9 @@ export class GameEngine {
   public pickups: Pickup[] = [];
   public hazards: Hazard[] = [];
   public cameraY: number = 0;
+  
+  // Mastery tracking
+  private lastPulseTime: number = 0;
   
   constructor(config: Partial<GameConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -40,6 +47,7 @@ export class GameEngine {
     this.pickups = [];
     this.hazards = [];
     this.cameraY = 0;
+    this.lastPulseTime = 0;
     this.loop();
   }
   
@@ -90,6 +98,7 @@ export class GameEngine {
     const newTimer = store.timer - dt;
     if (newTimer <= 0) {
       store.setPhase('ended');
+      store.endRun(); // Save mastery progress
       this.stop();
       return;
     }
@@ -106,6 +115,11 @@ export class GameEngine {
       return; // Pause gameplay during upgrade selection
     }
     
+    // Track low HP time for Risk Mastery
+    if (this.player.hp === 1) {
+      store.addLowHpTime(dt);
+    }
+    
     // Update player
     updatePlayer(this.player, dt, this.config);
     
@@ -113,7 +127,7 @@ export class GameEngine {
     this.cameraY = Math.max(0, this.player.position.y - this.config.screenHeight / 2);
     
     // Spawn pickups
-    if (Math.random() < 0.02 * store.difficulty) {
+    if (Math.random() < 0.025 * store.difficulty) {
       const pickup = spawnPickup(this.player.position.y, this.config, store.difficulty);
       this.pickups.push(pickup);
     }
@@ -128,9 +142,21 @@ export class GameEngine {
     // Update hazards
     updateHazards(this.hazards, this.player, dt);
     
-    // Check collisions
+    // Check collisions with mastery tracking
     checkPickupCollisions(this.pickups, this.player, store);
-    checkHazardCollisions(this.hazards, this.player, store);
+    const collisionResult = checkHazardCollisions(this.hazards, this.player, store);
+    
+    // Track near misses and phase throughs
+    if (collisionResult.nearMisses > 0) {
+      for (let i = 0; i < collisionResult.nearMisses; i++) {
+        store.addNearMiss();
+      }
+    }
+    if (collisionResult.phaseThroughs > 0) {
+      for (let i = 0; i < collisionResult.phaseThroughs; i++) {
+        store.addPhaseThrough();
+      }
+    }
     
     // Clean up off-screen entities
     const cleanupThreshold = this.player.position.y - this.config.screenHeight;
@@ -161,6 +187,16 @@ export class GameEngine {
   private pulse() {
     const store = useGameStore.getState();
     const chargeRatio = this.player.charge / this.player.maxCharge;
+    const currentTime = performance.now() / 1000;
+    
+    // Check rhythm streak for Timing Mastery
+    if (this.lastPulseTime > 0) {
+      const timeSinceLastPulse = currentTime - this.lastPulseTime;
+      const isGoodRhythm = timeSinceLastPulse >= RHYTHM_WINDOW_MIN && 
+                          timeSinceLastPulse <= RHYTHM_WINDOW_MAX;
+      store.updateRhythmStreak(isGoodRhythm);
+    }
+    this.lastPulseTime = currentTime;
     
     // Dash forward (up)
     this.player.velocity.y += this.player.dashPower * chargeRatio;
@@ -182,7 +218,7 @@ export class GameEngine {
     // Perfect pulse bonus (charge near max)
     if (chargeRatio > 0.9) {
       store.addPerfectPulse();
-      store.addScore(50 * store.multiplier);
+      store.addScore(50 * (store.multiplier || 1));
     }
     
     // Add heat
