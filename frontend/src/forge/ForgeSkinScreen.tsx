@@ -283,19 +283,30 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
             {selectedIndex !== null && (
               <View style={styles.actionButtons}>
                 <Pressable
-                  style={styles.useSkinButton}
+                  style={({ pressed }) => [
+                    styles.useSkinButton,
+                    pressed && { opacity: 0.8 }
+                  ]}
                   onPress={() => {
                     console.log('[Forge] USE THIS SKIN pressed!');
                     handleUseSkin();
                   }}
                   accessibilityRole="button"
+                  // @ts-ignore - onClick for web compatibility
+                  onClick={() => {
+                    console.log('[Forge] USE THIS SKIN onClick!');
+                    handleUseSkin();
+                  }}
                 >
                   <Ionicons name="checkmark-circle" size={20} color="#0a0a1a" />
                   <Text style={styles.useSkinText}>USE THIS SKIN</Text>
                 </Pressable>
 
                 <Pressable
-                  style={styles.mintButton}
+                  style={({ pressed }) => [
+                    styles.mintButton,
+                    pressed && { opacity: 0.8 }
+                  ]}
                   onPress={() => {
                     console.log('[Forge] MINT NFT pressed!');
                     handleMintNFT();
