@@ -312,6 +312,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Calculate Blueprints
     const rewards = calculateRunBlueprints(state.score, state.masteryStats);
     
+    // Track run end analytics
+    Analytics.trackRunEnd({
+      score: state.score,
+      duration: Math.floor(state.maxTime - state.timer),
+      segment_reached: Math.floor((state.maxTime - state.timer) / 15) + 1,
+      death_cause: state.hp <= 0 ? 'collision' : null,
+      perfect_count: state.perfectPulses,
+      near_miss_count: state.masteryStats.nearMisses,
+      blueprints_earned_total: rewards.totalBlueprints,
+    });
+    Analytics.endRun();
+    Analytics.flush();
+    
     // Update persistent mastery
     const newMastery = { ...state.persistentMastery };
     newMastery.progress.timing += xpGained.timing;
