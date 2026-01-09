@@ -20,7 +20,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Pulse Forge API", version="1.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -38,7 +38,7 @@ class StatusCheckCreate(BaseModel):
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Pulse Forge API", "version": "1.0.0"}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -52,8 +52,40 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
-# Include the router in the main app
+
+# Import and include analytics router
+from analytics.router import analytics_router, set_analytics_db
+from analytics.database import AnalyticsDB
+from analytics.demo_data import generate_demo_data, clear_demo_data
+
+# Initialize analytics DB
+analytics_db = AnalyticsDB(db)
+set_analytics_db(analytics_db)
+
+# Include analytics router
+api_router.include_router(analytics_router)
+
+# Include the main router in the app
 app.include_router(api_router)
+
+
+# Admin endpoint to generate demo data
+@api_router.post("/admin/generate-demo-data")
+async def admin_generate_demo_data(
+    days: int = 14,
+    players: int = 100
+):
+    """Generate demo data for testing (admin only)"""
+    result = await generate_demo_data(analytics_db, days=days, players=players)
+    return {"success": True, "generated": result}
+
+
+@api_router.delete("/admin/clear-demo-data")
+async def admin_clear_demo_data():
+    """Clear all analytics demo data (admin only)"""
+    await clear_demo_data(analytics_db)
+    return {"success": True, "message": "All demo data cleared"}
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,6 +101,14 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize indexes on startup"""
+    await analytics_db.ensure_indexes()
+    logger.info("Analytics DB indexes created")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
