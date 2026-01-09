@@ -178,3 +178,31 @@ export interface RunRewards {
   buildBonus: number;
   totalBlueprints: number;
 }
+
+// Forged Skin Recipe (re-exported from skinForge)
+export interface SkinRecipe {
+  id: string;
+  prompt: string;
+  seed: string;
+  createdAt: number;
+  
+  // Visual properties
+  baseShape: 'circle' | 'hexagon' | 'diamond' | 'star' | 'ring';
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  auraType: 'glow' | 'rings' | 'pulse' | 'glitch' | 'flame' | 'electric';
+  particleStyle: 'sparks' | 'dots' | 'stars' | 'none' | 'bubbles' | 'lightning';
+  outlineStyle: 'solid' | 'dashed' | 'double' | 'none' | 'gradient';
+  outlineColor: string;
+  
+  // Animation hints
+  pulseSpeed: number;
+  rotationSpeed: number;
+  glowIntensity: number;
+  
+  // NFT metadata
+  mintedOnChain?: boolean;
+  tokenId?: string;
+  transactionHash?: string;
+}
