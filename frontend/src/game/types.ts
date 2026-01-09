@@ -1,4 +1,4 @@
-// Core game types
+// Core game types with Blueprints meta-progression
 
 export interface Vector2 {
   x: number;
@@ -30,8 +30,8 @@ export interface Player extends Entity {
   invincible: boolean;
   invincibleTimer: number;
   // Mastery tracking
-  lowHpTime: number; // Time spent at 1 HP
-  lastPulseTime: number; // For rhythm tracking
+  lowHpTime: number;
+  lastPulseTime: number;
 }
 
 export interface Pickup extends Entity {
@@ -44,17 +44,13 @@ export interface Hazard extends Entity {
   type: 'wall' | 'drone' | 'laser';
   phaseable: boolean;
   damage: number;
-  // For walls
   width?: number;
   height?: number;
-  // For lasers
   angle?: number;
   length?: number;
   telegraphed?: boolean;
   telegraphTimer?: number;
-  // For drones
   speed?: number;
-  // Near-miss tracking
   nearMissChecked?: boolean;
 }
 
@@ -66,6 +62,7 @@ export interface Upgrade {
   category: 'pulse' | 'movement' | 'defense' | 'economy' | 'synergy';
   effects: UpgradeEffect[];
   requiresMastery?: MasteryRequirement;
+  blueprintCost?: number; // Cost to unlock with blueprints
 }
 
 export interface UpgradeEffect {
@@ -80,25 +77,20 @@ export interface MasteryRequirement {
 }
 
 export interface MasteryProgress {
-  timing: number;  // 0-100
-  risk: number;    // 0-100
-  build: number;   // 0-100
+  timing: number;
+  risk: number;
+  build: number;
 }
 
 export interface MasteryStats {
-  // Timing Mastery
   perfectPulses: number;
-  rhythmStreak: number;      // Consecutive pulses with good timing
+  rhythmStreak: number;
   maxRhythmStreak: number;
-  
-  // Risk Mastery
-  nearMisses: number;        // Passed close to hazards without hitting
-  lowHpSurvivalTime: number; // Seconds survived at 1 HP
-  phaseThroughs: number;     // Times phased through phaseable hazards
-  
-  // Build Mastery
-  categoriesUsed: Set<string>; // Unique upgrade categories used
-  upgradesSynergized: number;  // Upgrades that combo with others
+  nearMisses: number;
+  lowHpSurvivalTime: number;
+  phaseThroughs: number;
+  categoriesUsed: Set<string>;
+  upgradesSynergized: number;
 }
 
 export interface RunMasteryData {
@@ -123,15 +115,13 @@ export interface GameState {
   selectedUpgrades: Upgrade[];
   lastUpgradeTime: number;
   upgradeInterval: number;
-  
-  // Mastery tracking for current run
   masteryStats: MasteryStats;
-  recentEvents: MasteryEvent[]; // For UI feedback
+  recentEvents: MasteryEvent[];
 }
 
 export interface MasteryEvent {
   id: string;
-  type: 'perfect_pulse' | 'near_miss' | 'rhythm_streak' | 'phase_through' | 'low_hp_bonus' | 'category_bonus';
+  type: 'perfect_pulse' | 'near_miss' | 'rhythm_streak' | 'phase_through' | 'low_hp_bonus' | 'category_bonus' | 'blueprint_earned';
   timestamp: number;
   value?: number;
 }
@@ -145,11 +135,46 @@ export interface GameConfig {
   fixedDeltaTime: number;
 }
 
-// Persistent mastery data
+// Cosmetic skin definition
+export interface CosmeticSkin {
+  id: string;
+  name: string;
+  description: string;
+  coreColor: string;
+  glowColor: string;
+  phaseColor: string;
+  blueprintCost: number;
+}
+
+// Hazard theme definition
+export interface HazardTheme {
+  id: string;
+  name: string;
+  description: string;
+  wallColor: string;
+  droneColor: string;
+  laserColor: string;
+  blueprintCost: number;
+}
+
+// Persistent mastery data with Blueprints
 export interface PersistentMastery {
   progress: MasteryProgress;
   totalRuns: number;
   highScore: number;
+  blueprints: number; // Meta currency
   unlockedUpgrades: string[];
   unlockedCosmetics: string[];
+  unlockedThemes: string[];
+  selectedSkin: string;
+  selectedTheme: string;
+}
+
+// Run rewards summary
+export interface RunRewards {
+  baseBlueprints: number;
+  timingBonus: number;
+  riskBonus: number;
+  buildBonus: number;
+  totalBlueprints: number;
 }
