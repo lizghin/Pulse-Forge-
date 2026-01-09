@@ -1,6 +1,6 @@
 // Player system
 
-import { Player, GameConfig, Vector2 } from '../types';
+import { Player, GameConfig } from '../types';
 
 let playerIdCounter = 0;
 
@@ -26,6 +26,9 @@ export function createPlayer(config: GameConfig): Player {
     magnetRange: 150,
     invincible: false,
     invincibleTimer: 0,
+    // Mastery tracking
+    lowHpTime: 0,
+    lastPulseTime: 0,
   };
 }
 
@@ -68,6 +71,11 @@ export function updatePlayer(player: Player, dt: number, config: GameConfig) {
   
   // Reduce heat over time
   player.heat = Math.max(0, player.heat - 0.1 * dt);
+  
+  // Track low HP time
+  if (player.hp === 1) {
+    player.lowHpTime += dt;
+  }
 }
 
 export function damagePlayer(player: Player, damage: number, store: any) {
@@ -79,5 +87,6 @@ export function damagePlayer(player: Player, damage: number, store: any) {
   
   if (player.hp <= 0) {
     store.setPhase('ended');
+    store.endRun(); // Save mastery progress
   }
 }
