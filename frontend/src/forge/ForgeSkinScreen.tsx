@@ -6,6 +6,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   SafeAreaView,
   ScrollView,
   TextInput,
