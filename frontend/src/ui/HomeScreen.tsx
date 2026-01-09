@@ -23,7 +23,7 @@ interface HomeScreenProps {
   onMySkins?: () => void;
 }
 
-export function HomeScreen({ onPlay, onSettings, onUnlocks }: HomeScreenProps) {
+export function HomeScreen({ onPlay, onSettings, onUnlocks, onForge, onMySkins }: HomeScreenProps) {
   const { persistentMastery, loadMastery } = useGameStore();
   
   useEffect(() => {
