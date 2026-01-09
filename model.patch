@@ -1,117 +1,122 @@
-diff --git a/frontend/src/game/store.ts b/frontend/src/game/store.ts
-index 19d7bef..fe47e81 100644
---- a/frontend/src/game/store.ts
-+++ b/frontend/src/game/store.ts
-@@ -2,6 +2,7 @@
- 
- import { create } from 'zustand';
- import { GameState, Upgrade, MasteryStats, MasteryEvent, PersistentMastery, RunRewards } from './types';
-+import Analytics from '../analytics';
- import { getAvailableUpgrades, ALL_UPGRADES } from './data/upgrades';
- import { 
-   loadMasteryData, 
-@@ -241,6 +242,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
-   },
-   
-   selectUpgrade: (upgrade) => {
-+    // Track upgrade selection
-+    Analytics.trackUpgradeSelected({
-+      upgrade_id: upgrade.id,
-+      rarity: upgrade.rarity,
-+      category: upgrade.category,
-+    });
-+    
-     set((state) => {
-       const newStats = { ...state.masteryStats };
-       newStats.categoriesUsed = new Set([...state.masteryStats.categoriesUsed, upgrade.category]);
-@@ -275,15 +283,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
-     });
-   },
-   
--  startGame: () => set({
--    ...INITIAL_STATE,
--    phase: 'countdown',
--    masteryStats: createInitialMasteryStats(),
--    recentEvents: [],
--    persistentMastery: get().persistentMastery,
--    newUnlocks: [],
--    runRewards: null,
--  }),
-+  startGame: () => {
-+    Analytics.startRun();
-+    set({
-+      ...INITIAL_STATE,
-+      phase: 'countdown',
-+      masteryStats: createInitialMasteryStats(),
-+      recentEvents: [],
-+      persistentMastery: get().persistentMastery,
-+      newUnlocks: [],
-+      runRewards: null,
-+    });
-+  },
-   
-   resetGame: () => set((state) => ({
-     ...INITIAL_STATE,
-@@ -314,6 +325,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
-     const unlocks = checkMasteryUnlocks(newMastery);
-     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, ...unlocks];
-     
-+    // Track run end analytics
-+    Analytics.trackRunEnd({
-+      score: state.score,
-+      duration: state.maxTime - state.timer,
-+      segment_reached: Math.floor(state.distance / 100),
-+      death_cause: state.phase === 'ended' ? 'collision' : null,
-+      perfect_count: state.perfectPulses,
-+      near_miss_count: state.masteryStats.nearMisses,
-+      blueprints_earned_total: rewards.totalBlueprints,
-+    });
-+    
-+    // End analytics run
-+    Analytics.endRun();
-+    
-     // Save to storage
-     await saveMasteryData(newMastery);
-     
-@@ -340,6 +365,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
-     newMastery.blueprints -= cost;
-     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, upgradeId];
-     
-+    // Track blueprint spending
-+    Analytics.trackBlueprintSpent({
-+      item_type: 'upgrade',
-+      item_id: upgradeId,
-+      cost: cost,
-+    });
-+    
-     await saveMasteryData(newMastery);
-     set({ persistentMastery: newMastery });
-     return true;
-@@ -354,6 +386,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
-     newMastery.blueprints -= cost;
-     newMastery.unlockedCosmetics = [...newMastery.unlockedCosmetics, cosmeticId];
-     
-+    // Track blueprint spending
-+    Analytics.trackBlueprintSpent({
-+      item_type: 'cosmetic',
-+      item_id: cosmeticId,
-+      cost: cost,
-+    });
-+    
-     await saveMasteryData(newMastery);
-     set({ persistentMastery: newMastery });
-     return true;
-@@ -368,6 +407,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
-     newMastery.blueprints -= cost;
-     newMastery.unlockedThemes = [...newMastery.unlockedThemes, themeId];
-     
-+    // Track blueprint spending
-+    Analytics.trackBlueprintSpent({
-+      item_type: 'theme',
-+      item_id: themeId,
-+      cost: cost,
-+    });
-+    
-     await saveMasteryData(newMastery);
-     set({ persistentMastery: newMastery });
-     return true;
+diff --git a/model.patch b/model.patch
+index 9cc73c2..e69de29 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,117 +0,0 @@
+-diff --git a/frontend/src/game/store.ts b/frontend/src/game/store.ts
+-index 19d7bef..fe47e81 100644
+---- a/frontend/src/game/store.ts
+-+++ b/frontend/src/game/store.ts
+-@@ -2,6 +2,7 @@
+- 
+- import { create } from 'zustand';
+- import { GameState, Upgrade, MasteryStats, MasteryEvent, PersistentMastery, RunRewards } from './types';
+-+import Analytics from '../analytics';
+- import { getAvailableUpgrades, ALL_UPGRADES } from './data/upgrades';
+- import { 
+-   loadMasteryData, 
+-@@ -241,6 +242,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-   },
+-   
+-   selectUpgrade: (upgrade) => {
+-+    // Track upgrade selection
+-+    Analytics.trackUpgradeSelected({
+-+      upgrade_id: upgrade.id,
+-+      rarity: upgrade.rarity,
+-+      category: upgrade.category,
+-+    });
+-+    
+-     set((state) => {
+-       const newStats = { ...state.masteryStats };
+-       newStats.categoriesUsed = new Set([...state.masteryStats.categoriesUsed, upgrade.category]);
+-@@ -275,15 +283,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-     });
+-   },
+-   
+--  startGame: () => set({
+--    ...INITIAL_STATE,
+--    phase: 'countdown',
+--    masteryStats: createInitialMasteryStats(),
+--    recentEvents: [],
+--    persistentMastery: get().persistentMastery,
+--    newUnlocks: [],
+--    runRewards: null,
+--  }),
+-+  startGame: () => {
+-+    Analytics.startRun();
+-+    set({
+-+      ...INITIAL_STATE,
+-+      phase: 'countdown',
+-+      masteryStats: createInitialMasteryStats(),
+-+      recentEvents: [],
+-+      persistentMastery: get().persistentMastery,
+-+      newUnlocks: [],
+-+      runRewards: null,
+-+    });
+-+  },
+-   
+-   resetGame: () => set((state) => ({
+-     ...INITIAL_STATE,
+-@@ -314,6 +325,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-     const unlocks = checkMasteryUnlocks(newMastery);
+-     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, ...unlocks];
+-     
+-+    // Track run end analytics
+-+    Analytics.trackRunEnd({
+-+      score: state.score,
+-+      duration: state.maxTime - state.timer,
+-+      segment_reached: Math.floor(state.distance / 100),
+-+      death_cause: state.phase === 'ended' ? 'collision' : null,
+-+      perfect_count: state.perfectPulses,
+-+      near_miss_count: state.masteryStats.nearMisses,
+-+      blueprints_earned_total: rewards.totalBlueprints,
+-+    });
+-+    
+-+    // End analytics run
+-+    Analytics.endRun();
+-+    
+-     // Save to storage
+-     await saveMasteryData(newMastery);
+-     
+-@@ -340,6 +365,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-     newMastery.blueprints -= cost;
+-     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, upgradeId];
+-     
+-+    // Track blueprint spending
+-+    Analytics.trackBlueprintSpent({
+-+      item_type: 'upgrade',
+-+      item_id: upgradeId,
+-+      cost: cost,
+-+    });
+-+    
+-     await saveMasteryData(newMastery);
+-     set({ persistentMastery: newMastery });
+-     return true;
+-@@ -354,6 +386,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-     newMastery.blueprints -= cost;
+-     newMastery.unlockedCosmetics = [...newMastery.unlockedCosmetics, cosmeticId];
+-     
+-+    // Track blueprint spending
+-+    Analytics.trackBlueprintSpent({
+-+      item_type: 'cosmetic',
+-+      item_id: cosmeticId,
+-+      cost: cost,
+-+    });
+-+    
+-     await saveMasteryData(newMastery);
+-     set({ persistentMastery: newMastery });
+-     return true;
+-@@ -368,6 +407,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
+-     newMastery.blueprints -= cost;
+-     newMastery.unlockedThemes = [...newMastery.unlockedThemes, themeId];
+-     
+-+    // Track blueprint spending
+-+    Analytics.trackBlueprintSpent({
+-+      item_type: 'theme',
+-+      item_id: themeId,
+-+      cost: cost,
+-+    });
+-+    
+-     await saveMasteryData(newMastery);
+-     set({ persistentMastery: newMastery });
+-     return true;
