@@ -1,4 +1,4 @@
-// Pulse Forge - Main Game Entry Point
+// Pulse Forge - Main Game Entry Point with Meta-Progression
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, StatusBar, Platform } from 'react-native';
@@ -13,20 +13,25 @@ import { RunHUD } from '../src/ui/RunHUD';
 import { UpgradeModal } from '../src/ui/UpgradeModal';
 import { EndScreen } from '../src/ui/EndScreen';
 import { Countdown } from '../src/ui/Countdown';
+import { UnlocksScreen } from '../src/ui/UnlocksScreen';
 import { Upgrade } from '../src/game/types';
 import { resetHazardSpawner } from '../src/game/systems/hazards';
+
+type Screen = 'home' | 'game' | 'unlocks';
 
 export default function PulseForge() {
   const engineRef = useRef<GameEngine | null>(null);
   const [engine, setEngine] = useState<GameEngine | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   
-  const { phase, setPhase, startGame, resetGame, selectUpgrade } = useGameStore();
+  const { phase, setPhase, startGame, resetGame, selectUpgrade, loadMastery } = useGameStore();
 
-  // Initialize engine
+  // Initialize engine and load mastery
   useEffect(() => {
     const gameEngine = new GameEngine();
     engineRef.current = gameEngine;
     setEngine(gameEngine);
+    loadMastery();
     
     return () => {
       gameEngine.stop();
@@ -36,7 +41,7 @@ export default function PulseForge() {
   const handlePlay = useCallback(() => {
     resetHazardSpawner();
     startGame();
-    // Haptic feedback
+    setCurrentScreen('game');
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -45,7 +50,6 @@ export default function PulseForge() {
   const handleCountdownComplete = useCallback(() => {
     setPhase('playing');
     engineRef.current?.start();
-    // Haptic feedback
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
@@ -83,9 +87,7 @@ export default function PulseForge() {
         }
       });
     }
-    // Resume engine
     engineRef.current?.resume();
-    // Haptic feedback
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -103,45 +105,57 @@ export default function PulseForge() {
   const handleHome = useCallback(() => {
     engineRef.current?.stop();
     resetGame();
+    setCurrentScreen('home');
   }, [resetGame]);
 
   const handleSettings = useCallback(() => {
-    // TODO: Implement settings screen
     console.log('Settings pressed');
+  }, []);
+
+  const handleUnlocks = useCallback(() => {
+    setCurrentScreen('unlocks');
+  }, []);
+
+  const handleBackFromUnlocks = useCallback(() => {
+    setCurrentScreen('home');
   }, []);
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a1a" />
       
-      {/* Menu Screen */}
-      {phase === 'menu' && (
-        <HomeScreen onPlay={handlePlay} onSettings={handleSettings} />
+      {/* Home Screen */}
+      {currentScreen === 'home' && (
+        <HomeScreen 
+          onPlay={handlePlay} 
+          onSettings={handleSettings} 
+          onUnlocks={handleUnlocks}
+        />
+      )}
+
+      {/* Unlocks Screen */}
+      {currentScreen === 'unlocks' && (
+        <UnlocksScreen onBack={handleBackFromUnlocks} />
       )}
 
       {/* Game Screen */}
-      {(phase === 'countdown' || phase === 'playing' || phase === 'upgrade' || phase === 'ended') && (
+      {currentScreen === 'game' && (
         <View style={styles.gameContainer}>
-          {/* Game Canvas */}
           <GameCanvas engine={engine} />
           
-          {/* HUD Overlay */}
           {(phase === 'playing' || phase === 'upgrade') && (
             <RunHUD player={engine?.player || null} />
           )}
           
-          {/* Countdown */}
           {phase === 'countdown' && (
             <Countdown onComplete={handleCountdownComplete} />
           )}
           
-          {/* Upgrade Selection */}
           <UpgradeModal
             visible={phase === 'upgrade'}
             onSelect={handleSelectUpgrade}
           />
           
-          {/* End Screen */}
           {phase === 'ended' && (
             <View style={styles.endOverlay}>
               <EndScreen onRetry={handleRetry} onHome={handleHome} />
