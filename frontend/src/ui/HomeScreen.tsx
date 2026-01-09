@@ -1,6 +1,6 @@
-// Home Screen
+// Home Screen with Mastery Display
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useGameStore } from '../game/store';
+import { getMasteryLevel, MASTERY_TRACKS } from '../game/mastery';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface HomeScreenProps {
   onPlay: () => void;
@@ -20,11 +21,21 @@ interface HomeScreenProps {
 }
 
 export function HomeScreen({ onPlay, onSettings }: HomeScreenProps) {
+  const { persistentMastery, loadMastery } = useGameStore();
+  
+  useEffect(() => {
+    loadMastery();
+  }, []);
+  
+  const timingLevel = getMasteryLevel(persistentMastery.progress.timing);
+  const riskLevel = getMasteryLevel(persistentMastery.progress.risk);
+  const buildLevel = getMasteryLevel(persistentMastery.progress.build);
+  const totalLevel = timingLevel + riskLevel + buildLevel;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Background */}
       <View style={styles.background}>
-        {/* Decorative circles */}
         <View style={[styles.circle, styles.circle1]} />
         <View style={[styles.circle, styles.circle2]} />
         <View style={[styles.circle, styles.circle3]} />
@@ -40,10 +51,32 @@ export function HomeScreen({ onPlay, onSettings }: HomeScreenProps) {
 
         <Text style={styles.subtitle}>90-Second Micro-Roguelike</Text>
 
+        {/* Mastery Summary */}
+        <View style={styles.masterySummary}>
+          <View style={styles.masteryItem}>
+            <Ionicons name="flash" size={16} color={MASTERY_TRACKS.timing.color} />
+            <Text style={[styles.masteryLevel, { color: MASTERY_TRACKS.timing.color }]}>
+              {timingLevel}
+            </Text>
+          </View>
+          <View style={styles.masteryItem}>
+            <Ionicons name="flame" size={16} color={MASTERY_TRACKS.risk.color} />
+            <Text style={[styles.masteryLevel, { color: MASTERY_TRACKS.risk.color }]}>
+              {riskLevel}
+            </Text>
+          </View>
+          <View style={styles.masteryItem}>
+            <Ionicons name="construct" size={16} color={MASTERY_TRACKS.build.color} />
+            <Text style={[styles.masteryLevel, { color: MASTERY_TRACKS.build.color }]}>
+              {buildLevel}
+            </Text>
+          </View>
+        </View>
+
         {/* Play Button */}
         <TouchableOpacity style={styles.playButton} onPress={onPlay} activeOpacity={0.8}>
           <View style={styles.playButtonInner}>
-            <Ionicons name="play" size={32} color="#0a0a1a" />
+            <Ionicons name="play" size={28} color="#0a0a1a" />
             <Text style={styles.playButtonText}>PLAY 90s RUN</Text>
           </View>
         </TouchableOpacity>
@@ -51,17 +84,21 @@ export function HomeScreen({ onPlay, onSettings }: HomeScreenProps) {
         {/* Secondary Buttons */}
         <View style={styles.secondaryButtons}>
           <TouchableOpacity style={styles.secondaryButton}>
-            <Ionicons name="grid" size={24} color="#00ffff" />
+            <Ionicons name="grid" size={22} color="#00ffff" />
             <Text style={styles.secondaryButtonText}>Upgrades</Text>
+            <Text style={styles.unlockCount}>
+              {persistentMastery.unlockedUpgrades.length + 12}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton}>
-            <Ionicons name="trophy" size={24} color="#ffaa00" />
-            <Text style={styles.secondaryButtonText}>Challenges</Text>
+            <Ionicons name="trophy" size={22} color="#ffaa00" />
+            <Text style={styles.secondaryButtonText}>Mastery</Text>
+            <Text style={styles.unlockCount}>Lv.{totalLevel}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onSettings}>
-            <Ionicons name="settings" size={24} color="#888" />
+            <Ionicons name="settings" size={22} color="#888" />
             <Text style={styles.secondaryButtonText}>Settings</Text>
           </TouchableOpacity>
         </View>
@@ -70,12 +107,14 @@ export function HomeScreen({ onPlay, onSettings }: HomeScreenProps) {
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>HIGH SCORE</Text>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>
+              {persistentMastery.highScore.toLocaleString()}
+            </Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>RUNS</Text>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{persistentMastery.totalRuns}</Text>
           </View>
         </View>
 
@@ -86,7 +125,10 @@ export function HomeScreen({ onPlay, onSettings }: HomeScreenProps) {
             <Text style={styles.highlight}>HOLD</Text> to charge your pulse
           </Text>
           <Text style={styles.instructionText}>
-            <Text style={styles.highlight}>RELEASE</Text> to dash forward & phase through obstacles
+            <Text style={styles.highlight}>RELEASE</Text> to dash & phase through
+          </Text>
+          <Text style={styles.instructionSubtext}>
+            Master timing, risk, and builds to unlock rewards
           </Text>
         </View>
       </View>
@@ -137,110 +179,139 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   title: {
-    fontSize: 56,
+    fontSize: 52,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 8,
   },
   titleAccent: {
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: '300',
     color: '#00ffff',
     letterSpacing: 12,
     marginTop: -8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     letterSpacing: 2,
-    marginBottom: 40,
+    marginBottom: 16,
+  },
+  masterySummary: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 28,
+  },
+  masteryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  masteryLevel: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   playButton: {
     width: SCREEN_WIDTH * 0.75,
-    maxWidth: 300,
-    marginBottom: 32,
+    maxWidth: 280,
+    marginBottom: 24,
   },
   playButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#00ffff',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
     borderRadius: 16,
-    gap: 12,
+    gap: 10,
   },
   playButtonText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#0a0a1a',
     letterSpacing: 2,
   },
   secondaryButtons: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 40,
+    gap: 12,
+    marginBottom: 28,
   },
   secondaryButton: {
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    minWidth: 80,
+    minWidth: 75,
   },
   secondaryButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#888',
-    marginTop: 8,
+    marginTop: 6,
+  },
+  unlockCount: {
+    fontSize: 10,
+    color: '#00ffff',
+    marginTop: 2,
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 32,
+    padding: 14,
+    marginBottom: 24,
   },
   statItem: {
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666',
     letterSpacing: 1,
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#fff',
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 36,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   instructions: {
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
   },
   instructionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
     letterSpacing: 2,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   instructionText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#888',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   highlight: {
     color: '#00ffff',
     fontWeight: '700',
+  },
+  instructionSubtext: {
+    fontSize: 11,
+    color: '#555',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });
