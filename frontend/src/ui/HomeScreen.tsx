@@ -19,6 +19,8 @@ interface HomeScreenProps {
   onPlay: () => void;
   onSettings: () => void;
   onUnlocks: () => void;
+  onForge?: () => void;
+  onMySkins?: () => void;
 }
 
 export function HomeScreen({ onPlay, onSettings, onUnlocks }: HomeScreenProps) {
