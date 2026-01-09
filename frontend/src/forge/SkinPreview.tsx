@@ -9,7 +9,6 @@ import Svg, {
   RadialGradient, 
   LinearGradient,
   Stop, 
-  G, 
   Ellipse,
   Path,
   Rect,
@@ -27,6 +26,9 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
   const coreRadius = size * 0.3;
   const auraRadius = size * 0.45;
   
+  // Ensure glowIntensity has a valid value
+  const glowIntensity = recipe?.glowIntensity || 0.5;
+  
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -40,7 +42,7 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
           
           {/* Aura Gradient */}
           <RadialGradient id="auraGradient" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={recipe.primaryColor} stopOpacity={recipe.glowIntensity * 0.5} />
+            <Stop offset="0%" stopColor={recipe.primaryColor} stopOpacity={glowIntensity * 0.5} />
             <Stop offset="100%" stopColor={recipe.primaryColor} stopOpacity={0} />
           </RadialGradient>
           
@@ -53,25 +55,13 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
         </Defs>
         
         {/* Aura Layer */}
-        <AuraLayer 
-          recipe={recipe} 
-          center={center} 
-          radius={auraRadius} 
-        />
+        {renderAura(recipe, center, auraRadius, glowIntensity)}
         
         {/* Particle Layer */}
-        <ParticleLayer 
-          recipe={recipe} 
-          center={center} 
-          radius={auraRadius} 
-        />
+        {renderParticles(recipe, center, auraRadius)}
         
         {/* Core Shape */}
-        <CoreShape 
-          recipe={recipe} 
-          center={center} 
-          radius={coreRadius} 
-        />
+        {renderCore(recipe, center, coreRadius)}
         
         {/* Inner Glow */}
         <Circle
@@ -86,12 +76,8 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
   );
 }
 
-// Core Shape Component
-function CoreShape({ recipe, center, radius }: {
-  recipe: SkinRecipe;
-  center: number;
-  radius: number;
-}) {
+// Core Shape Renderer
+function renderCore(recipe: SkinRecipe, center: number, radius: number) {
   const outlineWidth = recipe.outlineStyle === 'none' ? 0 : 
                        recipe.outlineStyle === 'double' ? 4 : 2;
   const strokeDasharray = recipe.outlineStyle === 'dashed' ? '5,3' : undefined;
@@ -107,37 +93,31 @@ function CoreShape({ recipe, center, radius }: {
   switch (recipe.baseShape) {
     case 'hexagon':
       return (
-        <G>
-          <Polygon
-            points={getHexagonPoints(center, center, radius)}
-            {...commonProps}
-          />
-        </G>
+        <Polygon
+          points={getHexagonPoints(center, center, radius)}
+          {...commonProps}
+        />
       );
     
     case 'diamond':
       return (
-        <G>
-          <Polygon
-            points={getDiamondPoints(center, center, radius)}
-            {...commonProps}
-          />
-        </G>
+        <Polygon
+          points={getDiamondPoints(center, center, radius)}
+          {...commonProps}
+        />
       );
     
     case 'star':
       return (
-        <G>
-          <Polygon
-            points={getStarPoints(center, center, radius, radius * 0.5, 5)}
-            {...commonProps}
-          />
-        </G>
+        <Polygon
+          points={getStarPoints(center, center, radius, radius * 0.5, 5)}
+          {...commonProps}
+        />
       );
     
     case 'ring':
       return (
-        <G>
+        <>
           <Circle
             cx={center}
             cy={center}
@@ -154,7 +134,7 @@ function CoreShape({ recipe, center, radius }: {
             fill={recipe.secondaryColor}
             opacity={0.9}
           />
-        </G>
+        </>
       );
     
     case 'circle':
@@ -170,53 +150,62 @@ function CoreShape({ recipe, center, radius }: {
   }
 }
 
-// Aura Layer Component
-function AuraLayer({ recipe, center, radius }: {
-  recipe: SkinRecipe;
-  center: number;
-  radius: number;
-}) {
+// Aura Renderer
+function renderAura(recipe: SkinRecipe, center: number, radius: number, glowIntensity: number) {
   switch (recipe.auraType) {
     case 'rings':
       return (
-        <G opacity={recipe.glowIntensity}>
-          {[1, 1.15, 1.3].map((scale, i) => (
-            <Circle
-              key={i}
-              cx={center}
-              cy={center}
-              r={radius * scale}
-              fill="none"
-              stroke={recipe.primaryColor}
-              strokeWidth={1.5}
-              opacity={0.6 - i * 0.15}
-            />
-          ))}
-        </G>
-      );
-    
-    case 'pulse':
-      return (
-        <G>
+        <>
           <Circle
             cx={center}
             cy={center}
             r={radius}
-            fill="url(#auraGradient)"
+            fill="none"
+            stroke={recipe.primaryColor}
+            strokeWidth={1.5}
+            opacity={0.6 * glowIntensity}
           />
-        </G>
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius * 1.15}
+            fill="none"
+            stroke={recipe.primaryColor}
+            strokeWidth={1.5}
+            opacity={0.45 * glowIntensity}
+          />
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius * 1.3}
+            fill="none"
+            stroke={recipe.primaryColor}
+            strokeWidth={1.5}
+            opacity={0.3 * glowIntensity}
+          />
+        </>
+      );
+    
+    case 'pulse':
+      return (
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="url(#auraGradient)"
+        />
       );
     
     case 'glitch':
       return (
-        <G opacity={recipe.glowIntensity}>
+        <>
           <Rect
             x={center - radius}
             y={center - 2}
             width={radius * 2}
             height={4}
             fill={recipe.accentColor}
-            opacity={0.5}
+            opacity={0.5 * glowIntensity}
           />
           <Rect
             x={center - 3}
@@ -224,36 +213,36 @@ function AuraLayer({ recipe, center, radius }: {
             width={6}
             height={radius * 1.6}
             fill={recipe.secondaryColor}
-            opacity={0.4}
+            opacity={0.4 * glowIntensity}
           />
-        </G>
+        </>
       );
     
     case 'flame':
       return (
-        <G opacity={recipe.glowIntensity}>
+        <>
           {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
             const x = center + Math.cos(rad) * radius * 0.7;
             const y = center + Math.sin(rad) * radius * 0.7;
             return (
               <Ellipse
-                key={i}
+                key={`flame-${i}`}
                 cx={x}
                 cy={y}
                 rx={radius * 0.15}
                 ry={radius * 0.25}
                 fill={i % 2 === 0 ? recipe.primaryColor : recipe.secondaryColor}
-                opacity={0.6}
+                opacity={0.6 * glowIntensity}
               />
             );
           })}
-        </G>
+        </>
       );
     
     case 'electric':
       return (
-        <G opacity={recipe.glowIntensity}>
+        <>
           {[0, 72, 144, 216, 288].map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
             const startX = center + Math.cos(rad) * radius * 0.5;
@@ -264,16 +253,16 @@ function AuraLayer({ recipe, center, radius }: {
             const midY = (startY + endY) / 2 + (i % 2 === 0 ? -5 : 5);
             return (
               <Path
-                key={i}
+                key={`electric-${i}`}
                 d={`M${startX},${startY} L${midX},${midY} L${endX},${endY}`}
                 stroke={recipe.accentColor}
                 strokeWidth={2}
                 fill="none"
-                opacity={0.8}
+                opacity={0.8 * glowIntensity}
               />
             );
           })}
-        </G>
+        </>
       );
     
     case 'glow':
@@ -289,12 +278,8 @@ function AuraLayer({ recipe, center, radius }: {
   }
 }
 
-// Particle Layer Component
-function ParticleLayer({ recipe, center, radius }: {
-  recipe: SkinRecipe;
-  center: number;
-  radius: number;
-}) {
+// Particle Renderer
+function renderParticles(recipe: SkinRecipe, center: number, radius: number) {
   if (recipe.particleStyle === 'none') return null;
   
   const particleCount = 8;
@@ -311,7 +296,7 @@ function ParticleLayer({ recipe, center, radius }: {
       case 'sparks':
         particles.push(
           <Circle
-            key={i}
+            key={`spark-${i}`}
             cx={x}
             cy={y}
             r={size}
@@ -324,7 +309,7 @@ function ParticleLayer({ recipe, center, radius }: {
       case 'dots':
         particles.push(
           <Circle
-            key={i}
+            key={`dot-${i}`}
             cx={x}
             cy={y}
             r={size * 0.8}
@@ -337,7 +322,7 @@ function ParticleLayer({ recipe, center, radius }: {
       case 'stars':
         particles.push(
           <Polygon
-            key={i}
+            key={`star-${i}`}
             points={getStarPoints(x, y, size * 1.5, size * 0.6, 4)}
             fill={recipe.accentColor}
             opacity={0.7}
@@ -348,7 +333,7 @@ function ParticleLayer({ recipe, center, radius }: {
       case 'bubbles':
         particles.push(
           <Circle
-            key={i}
+            key={`bubble-${i}`}
             cx={x}
             cy={y}
             r={size * 1.2}
@@ -364,7 +349,7 @@ function ParticleLayer({ recipe, center, radius }: {
         if (i % 2 === 0) {
           particles.push(
             <Path
-              key={i}
+              key={`lightning-${i}`}
               d={`M${x},${y - size * 2} L${x + size},${y} L${x - size},${y} L${x},${y + size * 2}`}
               stroke={recipe.accentColor}
               strokeWidth={1.5}
@@ -377,7 +362,7 @@ function ParticleLayer({ recipe, center, radius }: {
     }
   }
   
-  return <G>{particles}</G>;
+  return <>{particles}</>;
 }
 
 // Helper functions for shape generation
