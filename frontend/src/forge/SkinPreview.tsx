@@ -13,8 +13,6 @@ import Svg, {
   Ellipse,
   Path,
   Rect,
-  Animate,
-  AnimateTransform,
 } from 'react-native-svg';
 import { SkinRecipe } from './skinForge';
 
@@ -35,15 +33,15 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
         <Defs>
           {/* Core Gradient */}
           <RadialGradient id="coreGradient" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={recipe.primaryColor} stopOpacity="1" />
-            <Stop offset="70%" stopColor={recipe.secondaryColor} stopOpacity="0.9" />
-            <Stop offset="100%" stopColor={recipe.accentColor} stopOpacity="0.7" />
+            <Stop offset="0%" stopColor={recipe.primaryColor} stopOpacity={1} />
+            <Stop offset="70%" stopColor={recipe.secondaryColor} stopOpacity={0.9} />
+            <Stop offset="100%" stopColor={recipe.accentColor} stopOpacity={0.7} />
           </RadialGradient>
           
           {/* Aura Gradient */}
           <RadialGradient id="auraGradient" cx="50%" cy="50%" r="50%">
             <Stop offset="0%" stopColor={recipe.primaryColor} stopOpacity={recipe.glowIntensity * 0.5} />
-            <Stop offset="100%" stopColor={recipe.primaryColor} stopOpacity="0" />
+            <Stop offset="100%" stopColor={recipe.primaryColor} stopOpacity={0} />
           </RadialGradient>
           
           {/* Outline Gradient */}
@@ -59,7 +57,6 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
           recipe={recipe} 
           center={center} 
           radius={auraRadius} 
-          animated={animated}
         />
         
         {/* Particle Layer */}
@@ -67,7 +64,6 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
           recipe={recipe} 
           center={center} 
           radius={auraRadius} 
-          animated={animated}
         />
         
         {/* Core Shape */}
@@ -75,7 +71,6 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
           recipe={recipe} 
           center={center} 
           radius={coreRadius} 
-          animated={animated}
         />
         
         {/* Inner Glow */}
@@ -92,11 +87,10 @@ export function SkinPreview({ recipe, size = 100, animated = true }: SkinPreview
 }
 
 // Core Shape Component
-function CoreShape({ recipe, center, radius, animated }: {
+function CoreShape({ recipe, center, radius }: {
   recipe: SkinRecipe;
   center: number;
   radius: number;
-  animated: boolean;
 }) {
   const outlineWidth = recipe.outlineStyle === 'none' ? 0 : 
                        recipe.outlineStyle === 'double' ? 4 : 2;
@@ -118,16 +112,6 @@ function CoreShape({ recipe, center, radius, animated }: {
             points={getHexagonPoints(center, center, radius)}
             {...commonProps}
           />
-          {animated && (
-            <AnimateTransform
-              attributeName="transform"
-              type="rotate"
-              from={`0 ${center} ${center}`}
-              to={`360 ${center} ${center}`}
-              dur={`${20 / recipe.rotationSpeed}s`}
-              repeatCount="indefinite"
-            />
-          )}
         </G>
       );
     
@@ -187,11 +171,10 @@ function CoreShape({ recipe, center, radius, animated }: {
 }
 
 // Aura Layer Component
-function AuraLayer({ recipe, center, radius, animated }: {
+function AuraLayer({ recipe, center, radius }: {
   recipe: SkinRecipe;
   center: number;
   radius: number;
-  animated: boolean;
 }) {
   switch (recipe.auraType) {
     case 'rings':
@@ -220,16 +203,7 @@ function AuraLayer({ recipe, center, radius, animated }: {
             cy={center}
             r={radius}
             fill="url(#auraGradient)"
-          >
-            {animated && (
-              <Animate
-                attributeName="r"
-                values={`${radius};${radius * 1.2};${radius}`}
-                dur={`${2 / recipe.pulseSpeed}s`}
-                repeatCount="indefinite"
-              />
-            )}
-          </Circle>
+          />
         </G>
       );
     
@@ -271,7 +245,8 @@ function AuraLayer({ recipe, center, radius, animated }: {
                 ry={radius * 0.25}
                 fill={i % 2 === 0 ? recipe.primaryColor : recipe.secondaryColor}
                 opacity={0.6}
-                transform={`rotate(${angle} ${x} ${y})`}
+                rotation={angle}
+                origin={`${x}, ${y}`}
               />
             );
           })}
@@ -287,8 +262,8 @@ function AuraLayer({ recipe, center, radius, animated }: {
             const startY = center + Math.sin(rad) * radius * 0.5;
             const endX = center + Math.cos(rad) * radius * 1.1;
             const endY = center + Math.sin(rad) * radius * 1.1;
-            const midX = (startX + endX) / 2 + (Math.random() - 0.5) * 10;
-            const midY = (startY + endY) / 2 + (Math.random() - 0.5) * 10;
+            const midX = (startX + endX) / 2 + (i % 2 === 0 ? 5 : -5);
+            const midY = (startY + endY) / 2 + (i % 2 === 0 ? -5 : 5);
             return (
               <Path
                 key={i}
@@ -317,11 +292,10 @@ function AuraLayer({ recipe, center, radius, animated }: {
 }
 
 // Particle Layer Component
-function ParticleLayer({ recipe, center, radius, animated }: {
+function ParticleLayer({ recipe, center, radius }: {
   recipe: SkinRecipe;
   center: number;
   radius: number;
-  animated: boolean;
 }) {
   if (recipe.particleStyle === 'none') return null;
   
@@ -440,7 +414,7 @@ const styles = StyleSheet.create({
 });
 
 // Export a simplified game-ready renderer
-export function getSkinColors(recipe: SkinRecipe | null) {
+export function getSkinColors(recipe: SkinRecipe | null | undefined) {
   if (!recipe) {
     return {
       coreColor: '#00ffff',
