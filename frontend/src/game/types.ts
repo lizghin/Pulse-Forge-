@@ -29,6 +29,9 @@ export interface Player extends Entity {
   magnetRange: number;
   invincible: boolean;
   invincibleTimer: number;
+  // Mastery tracking
+  lowHpTime: number; // Time spent at 1 HP
+  lastPulseTime: number; // For rhythm tracking
 }
 
 export interface Pickup extends Entity {
@@ -51,6 +54,8 @@ export interface Hazard extends Entity {
   telegraphTimer?: number;
   // For drones
   speed?: number;
+  // Near-miss tracking
+  nearMissChecked?: boolean;
 }
 
 export interface Upgrade {
@@ -60,12 +65,49 @@ export interface Upgrade {
   rarity: 'common' | 'uncommon' | 'rare' | 'legendary';
   category: 'pulse' | 'movement' | 'defense' | 'economy' | 'synergy';
   effects: UpgradeEffect[];
+  requiresMastery?: MasteryRequirement;
 }
 
 export interface UpgradeEffect {
   stat: string;
   modifier: 'add' | 'multiply';
   value: number;
+}
+
+export interface MasteryRequirement {
+  track: 'timing' | 'risk' | 'build';
+  level: number;
+}
+
+export interface MasteryProgress {
+  timing: number;  // 0-100
+  risk: number;    // 0-100
+  build: number;   // 0-100
+}
+
+export interface MasteryStats {
+  // Timing Mastery
+  perfectPulses: number;
+  rhythmStreak: number;      // Consecutive pulses with good timing
+  maxRhythmStreak: number;
+  
+  // Risk Mastery
+  nearMisses: number;        // Passed close to hazards without hitting
+  lowHpSurvivalTime: number; // Seconds survived at 1 HP
+  phaseThroughs: number;     // Times phased through phaseable hazards
+  
+  // Build Mastery
+  categoriesUsed: Set<string>; // Unique upgrade categories used
+  upgradesSynergized: number;  // Upgrades that combo with others
+}
+
+export interface RunMasteryData {
+  stats: MasteryStats;
+  xpGained: {
+    timing: number;
+    risk: number;
+    build: number;
+  };
 }
 
 export interface GameState {
@@ -81,6 +123,17 @@ export interface GameState {
   selectedUpgrades: Upgrade[];
   lastUpgradeTime: number;
   upgradeInterval: number;
+  
+  // Mastery tracking for current run
+  masteryStats: MasteryStats;
+  recentEvents: MasteryEvent[]; // For UI feedback
+}
+
+export interface MasteryEvent {
+  id: string;
+  type: 'perfect_pulse' | 'near_miss' | 'rhythm_streak' | 'phase_through' | 'low_hp_bonus' | 'category_bonus';
+  timestamp: number;
+  value?: number;
 }
 
 export interface GameConfig {
@@ -90,4 +143,13 @@ export interface GameConfig {
   worldHeight: number;
   targetFPS: number;
   fixedDeltaTime: number;
+}
+
+// Persistent mastery data
+export interface PersistentMastery {
+  progress: MasteryProgress;
+  totalRuns: number;
+  highScore: number;
+  unlockedUpgrades: string[];
+  unlockedCosmetics: string[];
 }
