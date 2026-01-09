@@ -1,4 +1,4 @@
-// Pulse Forge - Main Game Entry Point with Meta-Progression
+// Pulse Forge - Main Game Entry with Forge Your Core Feature
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, StatusBar, Platform } from 'react-native';
@@ -14,29 +14,43 @@ import { UpgradeModal } from '../src/ui/UpgradeModal';
 import { EndScreen } from '../src/ui/EndScreen';
 import { Countdown } from '../src/ui/Countdown';
 import { UnlocksScreen } from '../src/ui/UnlocksScreen';
-import { Upgrade } from '../src/game/types';
+import { ForgeSkinScreen } from '../src/forge/ForgeSkinScreen';
+import { MySkinsScreen } from '../src/forge/MySkinsScreen';
+import { Upgrade, SkinRecipe } from '../src/game/types';
 import { resetHazardSpawner } from '../src/game/systems/hazards';
+import { getEquippedSkin, loadForgedSkins } from '../src/forge/skinForge';
 
-type Screen = 'home' | 'game' | 'unlocks';
+type Screen = 'home' | 'game' | 'unlocks' | 'forge' | 'myskins';
 
 export default function PulseForge() {
   const engineRef = useRef<GameEngine | null>(null);
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [equippedSkin, setEquippedSkin] = useState<SkinRecipe | null>(null);
   
   const { phase, setPhase, startGame, resetGame, selectUpgrade, loadMastery } = useGameStore();
 
-  // Initialize engine and load mastery
+  // Initialize engine and load data
   useEffect(() => {
     const gameEngine = new GameEngine();
     engineRef.current = gameEngine;
     setEngine(gameEngine);
     loadMastery();
+    loadEquippedSkin();
     
     return () => {
       gameEngine.stop();
     };
   }, []);
+
+  const loadEquippedSkin = async () => {
+    const equippedId = await getEquippedSkin();
+    if (equippedId) {
+      const skins = await loadForgedSkins();
+      const skin = skins.find(s => s.id === equippedId);
+      setEquippedSkin(skin || null);
+    }
+  };
 
   const handlePlay = useCallback(() => {
     resetHazardSpawner();
@@ -57,7 +71,6 @@ export default function PulseForge() {
 
   const handleSelectUpgrade = useCallback((upgrade: Upgrade) => {
     selectUpgrade(upgrade);
-    // Apply upgrade effects to player
     if (engineRef.current?.player) {
       const player = engineRef.current.player;
       upgrade.effects.forEach((effect) => {
@@ -116,8 +129,32 @@ export default function PulseForge() {
     setCurrentScreen('unlocks');
   }, []);
 
+  const handleForge = useCallback(() => {
+    setCurrentScreen('forge');
+  }, []);
+
+  const handleMySkins = useCallback(() => {
+    setCurrentScreen('myskins');
+  }, []);
+
   const handleBackFromUnlocks = useCallback(() => {
     setCurrentScreen('home');
+  }, []);
+
+  const handleBackFromForge = useCallback(() => {
+    setCurrentScreen('home');
+  }, []);
+
+  const handleBackFromMySkins = useCallback(() => {
+    setCurrentScreen('home');
+  }, []);
+
+  const handleSkinCreated = useCallback((recipe: SkinRecipe) => {
+    setEquippedSkin(recipe);
+  }, []);
+
+  const handleForgeFromMySkins = useCallback(() => {
+    setCurrentScreen('forge');
   }, []);
 
   return (
@@ -130,6 +167,8 @@ export default function PulseForge() {
           onPlay={handlePlay} 
           onSettings={handleSettings} 
           onUnlocks={handleUnlocks}
+          onForge={handleForge}
+          onMySkins={handleMySkins}
         />
       )}
 
@@ -138,10 +177,26 @@ export default function PulseForge() {
         <UnlocksScreen onBack={handleBackFromUnlocks} />
       )}
 
+      {/* Forge Skin Screen */}
+      {currentScreen === 'forge' && (
+        <ForgeSkinScreen 
+          onBack={handleBackFromForge} 
+          onSkinCreated={handleSkinCreated}
+        />
+      )}
+
+      {/* My Skins Screen */}
+      {currentScreen === 'myskins' && (
+        <MySkinsScreen 
+          onBack={handleBackFromMySkins}
+          onForgeNew={handleForgeFromMySkins}
+        />
+      )}
+
       {/* Game Screen */}
       {currentScreen === 'game' && (
         <View style={styles.gameContainer}>
-          <GameCanvas engine={engine} />
+          <GameCanvas engine={engine} equippedSkin={equippedSkin} />
           
           {(phase === 'playing' || phase === 'upgrade') && (
             <RunHUD player={engine?.player || null} />
