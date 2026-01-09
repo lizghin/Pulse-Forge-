@@ -284,8 +284,8 @@ export default function Dashboard() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ cause, percent }) =>
-                        `${cause} ${(percent * 100).toFixed(0)}%`
+                      label={({ name, percent }: { name: string; percent: number }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
                       }
                     >
                       {stats?.death_causes.map((_, index) => (
