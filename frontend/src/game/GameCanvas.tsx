@@ -101,7 +101,7 @@ export function GameCanvas({ engine, equippedSkin }: GameCanvasProps) {
         ))}
 
         {/* Player */}
-        <PlayerView player={engine.player} cameraY={cameraY} />
+        <PlayerView player={engine.player} cameraY={cameraY} equippedSkin={equippedSkin} />
       </View>
     </GestureDetector>
   );
