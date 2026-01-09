@@ -19,6 +19,7 @@ import { MySkinsScreen } from '../src/forge/MySkinsScreen';
 import { Upgrade, SkinRecipe } from '../src/game/types';
 import { resetHazardSpawner } from '../src/game/systems/hazards';
 import { getEquippedSkin, loadForgedSkins } from '../src/forge/skinForge';
+import Analytics from '../src/analytics';
 
 type Screen = 'home' | 'game' | 'unlocks' | 'forge' | 'myskins';
 
@@ -32,11 +33,13 @@ export default function PulseForge() {
   const [equippedSkin, setEquippedSkin] = useState<SkinRecipe | null>(null);
   const [lastSaveStatus, setLastSaveStatus] = useState<string>('none');
   const [showDebug, setShowDebug] = useState(false);
+  const runIdRef = useRef<string | null>(null);
   
   const { phase, setPhase, startGame, resetGame, selectUpgrade, loadMastery, persistentMastery } = useGameStore();
 
-  // Initialize engine and load data
+  // Initialize engine, analytics, and load data
   useEffect(() => {
+    Analytics.init();
     const gameEngine = new GameEngine();
     engineRef.current = gameEngine;
     setEngine(gameEngine);
