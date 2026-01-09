@@ -284,7 +284,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     persistentMastery: get().persistentMastery,
     newUnlocks: [],
     runRewards: null,
-  }),
+  }) && Analytics.startRun(),
   
   resetGame: () => set((state) => ({
     ...INITIAL_STATE,
