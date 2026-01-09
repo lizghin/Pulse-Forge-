@@ -242,6 +242,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   selectUpgrade: (upgrade) => {
+    // Track upgrade selection
+    Analytics.trackUpgradeSelected({
+      upgrade_id: upgrade.id,
+      rarity: upgrade.rarity,
+      category: upgrade.category,
+    });
+    
     set((state) => {
       const newStats = { ...state.masteryStats };
       newStats.categoriesUsed = new Set([...state.masteryStats.categoriesUsed, upgrade.category]);
