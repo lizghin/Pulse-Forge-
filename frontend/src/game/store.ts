@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { GameState, Upgrade, MasteryStats, MasteryEvent, PersistentMastery, RunRewards } from './types';
+import Analytics from '../analytics';
 import { getAvailableUpgrades, ALL_UPGRADES } from './data/upgrades';
 import { 
   loadMasteryData, 
