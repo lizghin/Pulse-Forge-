@@ -115,11 +115,14 @@ export default function PulseForge() {
     }
   }, [startGame]);
 
-  const handleHome = useCallback(() => {
+  const handleHome = useCallback(async () => {
     engineRef.current?.stop();
+    // Ensure mastery data is saved before navigating
+    // The endRun() should already be complete, but reload to ensure fresh data
+    await loadMastery();
     resetGame();
     setCurrentScreen('home');
-  }, [resetGame]);
+  }, [resetGame, loadMastery]);
 
   const handleSettings = useCallback(() => {
     console.log('Settings pressed');
