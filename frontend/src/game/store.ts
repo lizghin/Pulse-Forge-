@@ -283,15 +283,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
   
-  startGame: () => set({
-    ...INITIAL_STATE,
-    phase: 'countdown',
-    masteryStats: createInitialMasteryStats(),
-    recentEvents: [],
-    persistentMastery: get().persistentMastery,
-    newUnlocks: [],
-    runRewards: null,
-  }) && Analytics.startRun(),
+  startGame: () => {
+    Analytics.startRun();
+    set({
+      ...INITIAL_STATE,
+      phase: 'countdown',
+      masteryStats: createInitialMasteryStats(),
+      recentEvents: [],
+      persistentMastery: get().persistentMastery,
+      newUnlocks: [],
+      runRewards: null,
+    });
+  },
   
   resetGame: () => set((state) => ({
     ...INITIAL_STATE,
