@@ -12,8 +12,16 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
 import { SkinPreview } from './SkinPreview';
 import {
   SkinRecipe,
@@ -37,6 +45,17 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   const [variations, setVariations] = useState<SkinRecipe[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Animation values for cards
+  const card0Scale = useSharedValue(1);
+  const card1Scale = useSharedValue(1);
+  const card2Scale = useSharedValue(1);
+  
+  const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(style);
+    }
+  };
 
   const handleGenerate = useCallback(async () => {
     setError(null);
