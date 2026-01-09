@@ -57,17 +57,20 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 
-# Import and include analytics router
+# Import and include analytics routers
 from analytics.router import analytics_router, set_analytics_db
 from analytics.database import AnalyticsDB
 from analytics.demo_data import generate_demo_data, clear_demo_data
+from analytics_simple.router import simple_analytics_router, set_db as set_simple_db
 
 # Initialize analytics DB
 analytics_db = AnalyticsDB(db)
 set_analytics_db(analytics_db)
+set_simple_db(db)  # Simple analytics uses same db
 
-# Include analytics router
+# Include analytics routers
 api_router.include_router(analytics_router)
+api_router.include_router(simple_analytics_router)
 
 # Include the main router in the app
 app.include_router(api_router)
