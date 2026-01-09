@@ -227,28 +227,33 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
           <View style={styles.variationsSection}>
             <Text style={styles.sectionTitle}>CHOOSE YOUR SKIN</Text>
             <View style={styles.variationsGrid}>
-              {variations.map((recipe, index) => (
-                <TouchableOpacity
-                  key={recipe.id}
-                  style={[
-                    styles.variationCard,
-                    selectedIndex === index && styles.variationSelected,
-                  ]}
-                  onPress={() => handleSelectSkin(index)}
-                >
-                  <SkinPreview recipe={recipe} size={80} animated={true} />
-                  <Text style={styles.variationLabel}>#{index + 1}</Text>
-                  <View style={styles.variationInfo}>
-                    <Text style={styles.variationShape}>{recipe.baseShape}</Text>
-                    <Text style={styles.variationAura}>{recipe.auraType}</Text>
-                  </View>
-                  {selectedIndex === index && (
-                    <View style={styles.selectedBadge}>
-                      <Ionicons name="checkmark" size={14} color="#00ff88" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {variations.map((recipe, index) => {
+                const animStyle = index === 0 ? card0Style : index === 1 ? card1Style : card2Style;
+                return (
+                  <Animated.View key={recipe.id} style={animStyle}>
+                    <TouchableOpacity
+                      style={[
+                        styles.variationCard,
+                        selectedIndex === index && styles.variationSelected,
+                      ]}
+                      onPress={() => handleSelectSkin(index)}
+                      activeOpacity={0.8}
+                    >
+                      <SkinPreview recipe={recipe} size={80} animated={true} />
+                      <Text style={styles.variationLabel}>#{index + 1}</Text>
+                      <View style={styles.variationInfo}>
+                        <Text style={styles.variationShape}>{recipe.baseShape}</Text>
+                        <Text style={styles.variationAura}>{recipe.auraType}</Text>
+                      </View>
+                      {selectedIndex === index && (
+                        <View style={styles.selectedBadge}>
+                          <Ionicons name="checkmark" size={14} color="#00ff88" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
             </View>
 
             {/* Action Buttons */}
