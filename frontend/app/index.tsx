@@ -64,6 +64,7 @@ export default function PulseForge() {
 
   const handlePlay = useCallback(() => {
     resetHazardSpawner();
+    runIdRef.current = Analytics.startRun();
     startGame();
     setCurrentScreen('game');
     if (Platform.OS !== 'web') {
@@ -81,6 +82,14 @@ export default function PulseForge() {
 
   const handleSelectUpgrade = useCallback((upgrade: Upgrade) => {
     selectUpgrade(upgrade);
+    
+    // Track upgrade selection
+    Analytics.trackUpgradeSelected({
+      upgrade_id: upgrade.id,
+      rarity: upgrade.rarity,
+      category: upgrade.category,
+    });
+    
     if (engineRef.current?.player) {
       const player = engineRef.current.player;
       upgrade.effects.forEach((effect) => {
