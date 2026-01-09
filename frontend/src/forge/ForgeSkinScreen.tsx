@@ -95,20 +95,29 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   }, [card0Scale, card1Scale, card2Scale]);
 
   const handleUseSkin = useCallback(async () => {
-    if (selectedIndex === null) return;
+    if (selectedIndex === null) {
+      console.log('[Forge] No skin selected');
+      return;
+    }
     
+    console.log('[Forge] Using skin at index:', selectedIndex);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
     const selected = variations[selectedIndex];
     
     try {
+      console.log('[Forge] Saving skin:', selected.id);
       await saveForgedSkin(selected);
-      await setEquippedSkin(selected.id);
-      onSkinCreated(selected);
+      console.log('[Forge] Skin saved');
       
-      // Show brief success message then navigate back
-      // On web, Alert blocks - so we use a simpler approach
+      await setEquippedSkin(selected.id);
+      console.log('[Forge] Skin equipped');
+      
+      onSkinCreated(selected);
+      console.log('[Forge] onSkinCreated called');
+      
+      // Navigate back after save
+      console.log('[Forge] Navigating back, Platform:', Platform.OS);
       if (Platform.OS === 'web') {
-        // Navigate immediately after save
         onBack();
       } else {
         Alert.alert(
@@ -118,6 +127,7 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
         );
       }
     } catch (err) {
+      console.error('[Forge] Error saving skin:', err);
       setError('Failed to save skin. Please try again.');
     }
   }, [selectedIndex, variations, onBack, onSkinCreated]);
