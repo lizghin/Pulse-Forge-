@@ -284,7 +284,11 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
               <View style={styles.actionButtons}>
                 <Pressable
                   style={styles.useSkinButton}
-                  onPress={handleUseSkin}
+                  onPress={() => {
+                    console.log('[Forge] USE THIS SKIN pressed!');
+                    handleUseSkin();
+                  }}
+                  accessibilityRole="button"
                 >
                   <Ionicons name="checkmark-circle" size={20} color="#0a0a1a" />
                   <Text style={styles.useSkinText}>USE THIS SKIN</Text>
@@ -292,7 +296,11 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
 
                 <Pressable
                   style={styles.mintButton}
-                  onPress={handleMintNFT}
+                  onPress={() => {
+                    console.log('[Forge] MINT NFT pressed!');
+                    handleMintNFT();
+                  }}
+                  accessibilityRole="button"
                 >
                   <Ionicons name="diamond" size={18} color="#ffaa00" />
                   <Text style={styles.mintText}>MINT NFT</Text>
