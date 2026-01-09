@@ -1,14 +1,9 @@
 // Game Canvas using React Native Views
-// Simple approach that works on web and native
+// Renders player, pickups, and all hazard types (walls, drones, lasers)
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
 import { GameEngine } from './engine';
 import { useGameStore } from './store';
 import { Player, Pickup, Hazard } from './types';
@@ -63,7 +58,6 @@ export function GameCanvas({ engine }: GameCanvasProps) {
 
   if (!engine) return null;
 
-  const config = engine.getConfig();
   const cameraY = engine.cameraY;
 
   return (
@@ -78,10 +72,26 @@ export function GameCanvas({ engine }: GameCanvasProps) {
         {/* Grid lines */}
         <GridLines cameraY={cameraY} />
 
-        {/* Hazards */}
-        {engine.hazards.map((hazard) => (
-          <HazardView key={hazard.id} hazard={hazard} cameraY={cameraY} />
-        ))}
+        {/* Hazards (render lasers first so they appear behind) */}
+        {engine.hazards
+          .filter(h => h.type === 'laser')
+          .map((hazard) => (
+            <HazardView key={hazard.id} hazard={hazard} cameraY={cameraY} />
+          ))}
+        
+        {/* Walls */}
+        {engine.hazards
+          .filter(h => h.type === 'wall')
+          .map((hazard) => (
+            <HazardView key={hazard.id} hazard={hazard} cameraY={cameraY} />
+          ))}
+        
+        {/* Drones */}
+        {engine.hazards
+          .filter(h => h.type === 'drone')
+          .map((hazard) => (
+            <HazardView key={hazard.id} hazard={hazard} cameraY={cameraY} />
+          ))}
 
         {/* Pickups */}
         {engine.pickups.map((pickup) => (
@@ -261,69 +271,213 @@ function HazardView({ hazard, cameraY }: { hazard: Hazard; cameraY: number }) {
   
   const screenY = hazard.position.y - cameraY;
   
-  // Don't render if off screen
-  if (screenY < -100 || screenY > SCREEN_HEIGHT + 100) return null;
-  
-  const color = hazard.phaseable ? '#8844ff' : '#ff4444';
+  // Don't render if off screen (with buffer for lasers)
+  if (screenY < -150 || screenY > SCREEN_HEIGHT + 150) return null;
   
   switch (hazard.type) {
     case 'wall':
-      const width = hazard.width || 60;
-      const height = hazard.height || 20;
-      return (
-        <View
-          style={[
-            styles.wallContainer,
-            {
-              left: hazard.position.x,
-              top: screenY,
-              width,
-              height,
-            },
-          ]}
-        >
-          {/* Glow */}
-          <View
-            style={[
-              styles.wallGlow,
-              { backgroundColor: color },
-            ]}
-          />
-          
-          {/* Wall body */}
-          <View
-            style={[
-              styles.wallBody,
-              { backgroundColor: color },
-            ]}
-          />
-          
-          {/* Pattern for phaseable walls */}
-          {hazard.phaseable && (
-            <>
-              <View style={[styles.wallStripe, { top: 5 }]} />
-              <View style={[styles.wallStripe, { top: 12 }]} />
-            </>
-          )}
-        </View>
-      );
+      return <WallView hazard={hazard} screenY={screenY} />;
     case 'drone':
-      return (
-        <View
-          style={[
-            styles.droneBody,
-            {
-              left: hazard.position.x - hazard.radius,
-              top: screenY - hazard.radius,
-              width: hazard.radius * 2,
-              height: hazard.radius * 2,
-            },
-          ]}
-        />
-      );
+      return <DroneView hazard={hazard} screenY={screenY} />;
+    case 'laser':
+      return <LaserView hazard={hazard} screenY={screenY} />;
     default:
       return null;
   }
+}
+
+// WALL HAZARD
+function WallView({ hazard, screenY }: { hazard: Hazard; screenY: number }) {
+  const color = hazard.phaseable ? '#8844ff' : '#ff4444';
+  const width = hazard.width || 60;
+  const height = hazard.height || 20;
+  
+  return (
+    <View
+      style={[
+        styles.wallContainer,
+        {
+          left: hazard.position.x,
+          top: screenY,
+          width,
+          height,
+        },
+      ]}
+    >
+      {/* Glow */}
+      <View
+        style={[
+          styles.wallGlow,
+          { backgroundColor: color },
+        ]}
+      />
+      
+      {/* Wall body */}
+      <View
+        style={[
+          styles.wallBody,
+          { backgroundColor: color },
+        ]}
+      />
+      
+      {/* Pattern for phaseable walls */}
+      {hazard.phaseable && (
+        <>
+          <View style={[styles.wallStripe, { top: 5 }]} />
+          <View style={[styles.wallStripe, { top: 12 }]} />
+        </>
+      )}
+    </View>
+  );
+}
+
+// DRONE HAZARD
+function DroneView({ hazard, screenY }: { hazard: Hazard; screenY: number }) {
+  const isTelegraphing = hazard.telegraphed && (hazard.telegraphTimer ?? 0) > 0;
+  const baseColor = hazard.phaseable ? '#aa44ff' : '#ff6600';
+  
+  // Pulsing effect for telegraph
+  const pulseOpacity = isTelegraphing 
+    ? 0.3 + Math.sin(Date.now() / 100) * 0.3 
+    : 1;
+  
+  return (
+    <View
+      style={[
+        styles.droneContainer,
+        {
+          left: hazard.position.x - hazard.radius - 8,
+          top: screenY - hazard.radius - 8,
+          width: (hazard.radius + 8) * 2,
+          height: (hazard.radius + 8) * 2,
+        },
+      ]}
+    >
+      {/* Telegraph glow (pulsing warning) */}
+      {isTelegraphing && (
+        <View
+          style={[
+            styles.droneTelegraph,
+            {
+              backgroundColor: baseColor,
+              opacity: pulseOpacity,
+            },
+          ]}
+        />
+      )}
+      
+      {/* Outer ring */}
+      <View
+        style={[
+          styles.droneRing,
+          {
+            borderColor: baseColor,
+            opacity: isTelegraphing ? 0.5 : 1,
+          },
+        ]}
+      />
+      
+      {/* Core */}
+      <View
+        style={[
+          styles.droneCore,
+          {
+            width: hazard.radius * 2 - 8,
+            height: hazard.radius * 2 - 8,
+            backgroundColor: baseColor,
+            opacity: isTelegraphing ? 0.6 : 1,
+          },
+        ]}
+      />
+      
+      {/* Eye/center */}
+      <View style={styles.droneEye} />
+      
+      {/* Phaseable indicator */}
+      {hazard.phaseable && (
+        <View style={styles.dronePhaseIndicator} />
+      )}
+    </View>
+  );
+}
+
+// LASER HAZARD
+function LaserView({ hazard, screenY }: { hazard: Hazard; screenY: number }) {
+  const isTelegraphing = hazard.telegraphTimer !== undefined && hazard.telegraphTimer > 0;
+  const isActive = hazard.telegraphTimer !== undefined && hazard.telegraphTimer < 0;
+  
+  const width = hazard.width || SCREEN_WIDTH;
+  const height = hazard.height || 12;
+  
+  // Flash effect for active laser
+  const flashIntensity = isActive 
+    ? 0.8 + Math.sin(Date.now() / 30) * 0.2 
+    : 0;
+  
+  return (
+    <View
+      style={[
+        styles.laserContainer,
+        {
+          left: hazard.position.x,
+          top: screenY - height / 2 - 10,
+          width,
+          height: height + 20,
+        },
+      ]}
+    >
+      {/* Telegraph line (warning) */}
+      {isTelegraphing && (
+        <>
+          <View style={[styles.laserTelegraphLine, { height: 2 }]} />
+          <View style={[styles.laserTelegraphGlow, { height: 8 }]} />
+          {/* Warning markers */}
+          <View style={styles.laserWarningLeft}>
+            <View style={styles.warningTriangle} />
+          </View>
+          <View style={styles.laserWarningRight}>
+            <View style={styles.warningTriangle} />
+          </View>
+        </>
+      )}
+      
+      {/* Active beam */}
+      {isActive && (
+        <>
+          {/* Core beam */}
+          <View 
+            style={[
+              styles.laserBeam,
+              { 
+                height,
+                backgroundColor: '#ff0044',
+                opacity: flashIntensity,
+              },
+            ]} 
+          />
+          {/* Outer glow */}
+          <View 
+            style={[
+              styles.laserGlow,
+              { 
+                height: height + 8,
+                opacity: flashIntensity * 0.5,
+              },
+            ]} 
+          />
+          {/* Inner bright core */}
+          <View 
+            style={[
+              styles.laserCore,
+              { 
+                height: height / 2,
+              },
+            ]} 
+          />
+        </>
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -367,11 +521,6 @@ const styles = StyleSheet.create({
   },
   playerCore: {
     borderRadius: 999,
-    shadowColor: '#00ffff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
   },
   playerInnerGlow: {
     position: 'absolute',
@@ -399,6 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     transform: [{ rotate: '15deg' }],
   },
+  // WALL STYLES
   wallContainer: {
     position: 'absolute',
     overflow: 'hidden',
@@ -424,9 +574,102 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  droneBody: {
+  // DRONE STYLES
+  droneContainer: {
     position: 'absolute',
-    backgroundColor: '#ff6600',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  droneTelegraph: {
+    position: 'absolute',
+    width: '150%',
+    height: '150%',
     borderRadius: 999,
+  },
+  droneRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    borderWidth: 3,
+  },
+  droneCore: {
+    borderRadius: 999,
+  },
+  droneEye: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+  },
+  dronePhaseIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    width: 16,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 2,
+  },
+  // LASER STYLES
+  laserContainer: {
+    position: 'absolute',
+    justifyContent: 'center',
+  },
+  laserTelegraphLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#ff0044',
+    opacity: 0.8,
+    alignSelf: 'center',
+  },
+  laserTelegraphGlow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#ff0044',
+    opacity: 0.2,
+    alignSelf: 'center',
+  },
+  laserWarningLeft: {
+    position: 'absolute',
+    left: 5,
+    alignSelf: 'center',
+  },
+  laserWarningRight: {
+    position: 'absolute',
+    right: 5,
+    alignSelf: 'center',
+  },
+  warningTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#ff0044',
+  },
+  laserBeam: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignSelf: 'center',
+  },
+  laserGlow: {
+    position: 'absolute',
+    left: -4,
+    right: -4,
+    backgroundColor: '#ff0044',
+    alignSelf: 'center',
+  },
+  laserCore: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    alignSelf: 'center',
   },
 });
