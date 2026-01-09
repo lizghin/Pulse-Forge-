@@ -64,9 +64,11 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
     const validation = isPromptSafe(prompt);
     if (!validation.safe) {
       setError(validation.reason || 'Invalid prompt');
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
       return;
     }
     
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
     setVariations([]);
     setSelectedIndex(null);
@@ -78,15 +80,24 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
     const newVariations = generateSkinVariations(prompt, 3);
     setVariations(newVariations);
     setIsGenerating(false);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
   }, [prompt]);
 
   const handleSelectSkin = useCallback(async (index: number) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    // Animate card scale
+    const scales = [card0Scale, card1Scale, card2Scale];
+    scales[index].value = withSequence(
+      withSpring(1.1, { damping: 8 }),
+      withSpring(1, { damping: 12 })
+    );
     setSelectedIndex(index);
-  }, []);
+  }, [card0Scale, card1Scale, card2Scale]);
 
   const handleUseSkin = useCallback(async () => {
     if (selectedIndex === null) return;
     
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
     const selected = variations[selectedIndex];
     await saveForgedSkin(selected);
     await setEquippedSkin(selected.id);
@@ -100,6 +111,7 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   }, [selectedIndex, variations, onBack, onSkinCreated]);
 
   const handleExamplePress = useCallback((example: string) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPrompt(example);
     setError(null);
     setVariations([]);
@@ -109,12 +121,24 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   const handleMintNFT = useCallback(() => {
     if (selectedIndex === null) return;
     
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Mint as NFT',
       'NFT minting on testnet coming soon! For now, your skin is saved locally and usable in-game.',
       [{ text: 'Got it!' }]
     );
   }, [selectedIndex]);
+  
+  // Animated styles for cards
+  const card0Style = useAnimatedStyle(() => ({
+    transform: [{ scale: card0Scale.value }],
+  }));
+  const card1Style = useAnimatedStyle(() => ({
+    transform: [{ scale: card1Scale.value }],
+  }));
+  const card2Style = useAnimatedStyle(() => ({
+    transform: [{ scale: card2Scale.value }],
+  }));
 
   return (
     <SafeAreaView style={styles.container}>
