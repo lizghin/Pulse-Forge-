@@ -285,8 +285,12 @@ export async function saveForgedSkin(recipe: SkinRecipe): Promise<void> {
 
 export async function loadForgedSkins(): Promise<SkinRecipe[]> {
   try {
+    console.log('[skinForge] Loading forged skins...');
     const data = await AsyncStorage.getItem(FORGE_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    console.log('[skinForge] Raw data from storage:', data ? data.substring(0, 100) : 'null');
+    const parsed = data ? JSON.parse(data) : [];
+    console.log('[skinForge] Loaded skins count:', parsed.length);
+    return parsed;
   } catch (error) {
     console.error('Failed to load forged skins:', error);
     return [];
