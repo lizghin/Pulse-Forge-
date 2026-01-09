@@ -99,15 +99,27 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
     
     triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
     const selected = variations[selectedIndex];
-    await saveForgedSkin(selected);
-    await setEquippedSkin(selected.id);
-    onSkinCreated(selected);
     
-    Alert.alert(
-      'Skin Forged!',
-      'Your custom skin has been created and equipped.',
-      [{ text: 'Awesome!', onPress: onBack }]
-    );
+    try {
+      await saveForgedSkin(selected);
+      await setEquippedSkin(selected.id);
+      onSkinCreated(selected);
+      
+      // Show brief success message then navigate back
+      // On web, Alert blocks - so we use a simpler approach
+      if (Platform.OS === 'web') {
+        // Navigate immediately after save
+        onBack();
+      } else {
+        Alert.alert(
+          'Skin Forged!',
+          'Your custom skin has been created and equipped.',
+          [{ text: 'Awesome!', onPress: onBack }]
+        );
+      }
+    } catch (err) {
+      setError('Failed to save skin. Please try again.');
+    }
   }, [selectedIndex, variations, onBack, onSkinCreated]);
 
   const handleExamplePress = useCallback((example: string) => {
