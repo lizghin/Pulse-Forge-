@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   secondaryButtons: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   secondaryButton: {
     alignItems: 'center',
@@ -300,6 +300,27 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: '#00ffff',
     marginTop: 2,
+  },
+  forgeButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  forgeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,170,0,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,170,0,0.3)',
+    gap: 6,
+  },
+  forgeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffaa00',
   },
   statsContainer: {
     flexDirection: 'row',
