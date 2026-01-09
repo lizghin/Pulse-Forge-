@@ -26,9 +26,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface MySkinsScreenProps {
   onBack: () => void;
   onForgeNew: () => void;
+  onSkinEquipped?: () => void;
 }
 
-export function MySkinsScreen({ onBack, onForgeNew }: MySkinsScreenProps) {
+export function MySkinsScreen({ onBack, onForgeNew, onSkinEquipped }: MySkinsScreenProps) {
   const [skins, setSkins] = useState<SkinRecipe[]>([]);
   const [equippedId, setEquippedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
