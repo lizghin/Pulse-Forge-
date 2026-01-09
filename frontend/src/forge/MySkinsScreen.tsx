@@ -52,12 +52,14 @@ export function MySkinsScreen({ onBack, onForgeNew, onSkinEquipped }: MySkinsScr
   const handleEquip = useCallback(async (skinId: string) => {
     await setEquippedSkin(skinId);
     setEquippedId(skinId);
-  }, []);
+    onSkinEquipped?.();
+  }, [onSkinEquipped]);
 
   const handleUnequip = useCallback(async () => {
     await setEquippedSkin(null);
     setEquippedId(null);
-  }, []);
+    onSkinEquipped?.();
+  }, [onSkinEquipped]);
 
   const handleDelete = useCallback(async (skin: SkinRecipe) => {
     Alert.alert(
