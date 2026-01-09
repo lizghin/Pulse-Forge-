@@ -132,8 +132,8 @@ export class GameEngine {
       this.pickups.push(pickup);
     }
     
-    // Spawn hazards
-    const newHazards = spawnHazards(this.player.position.y, this.config, store.difficulty);
+    // Spawn hazards with elapsed time for deterministic difficulty
+    const newHazards = spawnHazards(this.player.position.y, this.config, store.difficulty, elapsed);
     this.hazards.push(...newHazards);
     
     // Update pickups
