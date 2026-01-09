@@ -1,12 +1,18 @@
-// Game Canvas using React Native Skia
+// Game Canvas using React Native Views
+// Simple approach that works on web and native
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Canvas, Circle, Rect, Group, Text as SkiaText, useFont, LinearGradient, vec, RoundedRect, Paint, Path, Skia, BlurMask } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { GameEngine } from './engine';
 import { useGameStore } from './store';
 import { Player, Pickup, Hazard } from './types';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -15,14 +21,14 @@ interface GameCanvasProps {
 }
 
 export function GameCanvas({ engine }: GameCanvasProps) {
-  const [, forceUpdate] = useState(0);
+  const [renderTick, setRenderTick] = useState(0);
   const phase = useGameStore((s) => s.phase);
   const animationRef = useRef<number | null>(null);
 
   // Render loop
   useEffect(() => {
     const render = () => {
-      forceUpdate((n) => n + 1);
+      setRenderTick((n) => n + 1);
       animationRef.current = requestAnimationFrame(render);
     };
     
@@ -37,23 +43,6 @@ export function GameCanvas({ engine }: GameCanvasProps) {
     };
   }, [phase]);
 
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      engine?.handleTouchStart();
-    })
-    .onEnd(() => {
-      engine?.handleTouchEnd();
-    });
-
-  const longPress = Gesture.LongPress()
-    .minDuration(0)
-    .onBegin(() => {
-      engine?.handleTouchStart();
-    })
-    .onEnd(() => {
-      engine?.handleTouchEnd();
-    });
-
   const pan = Gesture.Pan()
     .onBegin(() => {
       engine?.handleTouchStart();
@@ -62,7 +51,15 @@ export function GameCanvas({ engine }: GameCanvasProps) {
       engine?.handleTouchEnd();
     });
 
-  const gesture = Gesture.Race(pan, longPress);
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      engine?.handleTouchStart();
+    })
+    .onEnd(() => {
+      engine?.handleTouchEnd();
+    });
+
+  const gesture = Gesture.Race(pan, tap);
 
   if (!engine) return null;
 
@@ -72,40 +69,27 @@ export function GameCanvas({ engine }: GameCanvasProps) {
   return (
     <GestureDetector gesture={gesture}>
       <View style={styles.container}>
-        <Canvas style={styles.canvas}>
-          {/* Background gradient */}
-          <Rect x={0} y={0} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-            <LinearGradient
-              start={vec(0, 0)}
-              end={vec(0, SCREEN_HEIGHT)}
-              colors={['#0a0a1a', '#1a0a2a', '#0a1a2a']}
-            />
-          </Rect>
+        {/* Background gradient */}
+        <LinearGradient
+          colors={['#0a0a1a', '#1a0a2a', '#0a1a2a']}
+          style={StyleSheet.absoluteFill}
+        />
 
-          {/* Grid lines for depth perception */}
-          <GridLines cameraY={cameraY} />
+        {/* Grid lines */}
+        <GridLines cameraY={cameraY} />
 
-          {/* Hazards */}
-          {engine.hazards.map((hazard) => (
-            <HazardRenderer
-              key={hazard.id}
-              hazard={hazard}
-              cameraY={cameraY}
-            />
-          ))}
+        {/* Hazards */}
+        {engine.hazards.map((hazard) => (
+          <HazardView key={hazard.id} hazard={hazard} cameraY={cameraY} />
+        ))}
 
-          {/* Pickups */}
-          {engine.pickups.map((pickup) => (
-            <PickupRenderer
-              key={pickup.id}
-              pickup={pickup}
-              cameraY={cameraY}
-            />
-          ))}
+        {/* Pickups */}
+        {engine.pickups.map((pickup) => (
+          <PickupView key={pickup.id} pickup={pickup} cameraY={cameraY} />
+        ))}
 
-          {/* Player */}
-          <PlayerRenderer player={engine.player} cameraY={cameraY} />
-        </Canvas>
+        {/* Player */}
+        <PlayerView player={engine.player} cameraY={cameraY} />
       </View>
     </GestureDetector>
   );
@@ -122,13 +106,12 @@ function GridLines({ cameraY }: { cameraY: number }) {
     
     if (screenY >= -spacing && screenY <= SCREEN_HEIGHT + spacing) {
       lines.push(
-        <Rect
-          key={`h-${i}`}
-          x={0}
-          y={screenY}
-          width={SCREEN_WIDTH}
-          height={1}
-          color="rgba(100, 100, 255, 0.1)"
+        <View
+          key={`h-${worldY}`}
+          style={[
+            styles.gridLineH,
+            { top: screenY },
+          ]}
         />
       );
     }
@@ -138,13 +121,12 @@ function GridLines({ cameraY }: { cameraY: number }) {
   for (let i = 0; i < 8; i++) {
     const x = i * (SCREEN_WIDTH / 6);
     lines.push(
-      <Rect
+      <View
         key={`v-${i}`}
-        x={x}
-        y={0}
-        width={1}
-        height={SCREEN_HEIGHT}
-        color="rgba(100, 100, 255, 0.05)"
+        style={[
+          styles.gridLineV,
+          { left: x },
+        ]}
       />
     );
   }
@@ -152,7 +134,7 @@ function GridLines({ cameraY }: { cameraY: number }) {
   return <>{lines}</>;
 }
 
-function PlayerRenderer({ player, cameraY }: { player: Player; cameraY: number }) {
+function PlayerView({ player, cameraY }: { player: Player; cameraY: number }) {
   const screenY = player.position.y - cameraY;
   const chargeRatio = player.charge / player.maxCharge;
   const outerRadius = player.radius + chargeRatio * 15;
@@ -162,57 +144,57 @@ function PlayerRenderer({ player, cameraY }: { player: Player; cameraY: number }
   
   if (!visible) return null;
   
+  const baseColor = player.phaseActive ? '#ff00ff' : '#00ffff';
+  
   return (
-    <Group>
+    <View
+      style={[
+        styles.playerContainer,
+        {
+          left: player.position.x - outerRadius,
+          top: screenY - outerRadius,
+          width: outerRadius * 2,
+          height: outerRadius * 2,
+        },
+      ]}
+    >
       {/* Charge ring */}
       {chargeRatio > 0 && (
-        <Circle
-          cx={player.position.x}
-          cy={screenY}
-          r={outerRadius}
-          color={`rgba(0, 255, 255, ${0.3 + chargeRatio * 0.4})`}
-          style="stroke"
-          strokeWidth={3}
+        <View
+          style={[
+            styles.chargeRing,
+            {
+              borderColor: baseColor,
+              opacity: 0.3 + chargeRatio * 0.4,
+            },
+          ]}
         />
       )}
       
       {/* Phase glow */}
       {player.phaseActive && (
-        <Circle
-          cx={player.position.x}
-          cy={screenY}
-          r={player.radius + 10}
-          color="rgba(255, 0, 255, 0.5)"
-        >
-          <BlurMask blur={10} style="normal" />
-        </Circle>
+        <View style={styles.phaseGlow} />
       )}
       
       {/* Core */}
-      <Circle
-        cx={player.position.x}
-        cy={screenY}
-        r={player.radius}
-      >
-        <LinearGradient
-          start={vec(player.position.x - player.radius, screenY - player.radius)}
-          end={vec(player.position.x + player.radius, screenY + player.radius)}
-          colors={player.phaseActive ? ['#ff00ff', '#aa00ff'] : ['#00ffff', '#0088ff']}
-        />
-      </Circle>
+      <View
+        style={[
+          styles.playerCore,
+          {
+            width: player.radius * 2,
+            height: player.radius * 2,
+            backgroundColor: baseColor,
+          },
+        ]}
+      />
       
       {/* Inner glow */}
-      <Circle
-        cx={player.position.x}
-        cy={screenY}
-        r={player.radius * 0.5}
-        color="rgba(255, 255, 255, 0.8)"
-      />
-    </Group>
+      <View style={styles.playerInnerGlow} />
+    </View>
   );
 }
 
-function PickupRenderer({ pickup, cameraY }: { pickup: Pickup; cameraY: number }) {
+function PickupView({ pickup, cameraY }: { pickup: Pickup; cameraY: number }) {
   if (!pickup.active) return null;
   
   const screenY = pickup.position.y - cameraY;
@@ -229,41 +211,52 @@ function PickupRenderer({ pickup, cameraY }: { pickup: Pickup; cameraY: number }
   const color = colors[pickup.type];
   
   return (
-    <Group>
+    <View
+      style={[
+        styles.pickupContainer,
+        {
+          left: pickup.position.x - pickup.radius,
+          top: screenY - pickup.radius,
+        },
+      ]}
+    >
       {/* Glow */}
-      <Circle
-        cx={pickup.position.x}
-        cy={screenY}
-        r={pickup.radius + 5}
-        color={`${color}40`}
-      >
-        <BlurMask blur={8} style="normal" />
-      </Circle>
+      <View
+        style={[
+          styles.pickupGlow,
+          {
+            width: (pickup.radius + 5) * 2,
+            height: (pickup.radius + 5) * 2,
+            backgroundColor: color,
+          },
+        ]}
+      />
       
       {/* Core */}
       {pickup.type === 'shard' ? (
-        <RoundedRect
-          x={pickup.position.x - 6}
-          y={screenY - 10}
-          width={12}
-          height={20}
-          r={3}
-          color={color}
-          transform={[{ rotate: Math.PI / 6 }]}
+        <View
+          style={[
+            styles.shardShape,
+            { backgroundColor: color },
+          ]}
         />
       ) : (
-        <Circle
-          cx={pickup.position.x}
-          cy={screenY}
-          r={pickup.radius}
-          color={color}
+        <View
+          style={[
+            styles.pickupCore,
+            {
+              width: pickup.radius * 2,
+              height: pickup.radius * 2,
+              backgroundColor: color,
+            },
+          ]}
         />
       )}
-    </Group>
+    </View>
   );
 }
 
-function HazardRenderer({ hazard, cameraY }: { hazard: Hazard; cameraY: number }) {
+function HazardView({ hazard, cameraY }: { hazard: Hazard; cameraY: number }) {
   if (!hazard.active) return null;
   
   const screenY = hazard.position.y - cameraY;
@@ -275,58 +268,57 @@ function HazardRenderer({ hazard, cameraY }: { hazard: Hazard; cameraY: number }
   
   switch (hazard.type) {
     case 'wall':
+      const width = hazard.width || 60;
+      const height = hazard.height || 20;
       return (
-        <Group>
+        <View
+          style={[
+            styles.wallContainer,
+            {
+              left: hazard.position.x,
+              top: screenY,
+              width,
+              height,
+            },
+          ]}
+        >
           {/* Glow */}
-          <RoundedRect
-            x={hazard.position.x - 3}
-            y={screenY - 3}
-            width={(hazard.width || 60) + 6}
-            height={(hazard.height || 20) + 6}
-            r={5}
-            color={`${color}40`}
-          >
-            <BlurMask blur={5} style="normal" />
-          </RoundedRect>
+          <View
+            style={[
+              styles.wallGlow,
+              { backgroundColor: color },
+            ]}
+          />
           
-          {/* Wall */}
-          <RoundedRect
-            x={hazard.position.x}
-            y={screenY}
-            width={hazard.width || 60}
-            height={hazard.height || 20}
-            r={3}
-            color={color}
+          {/* Wall body */}
+          <View
+            style={[
+              styles.wallBody,
+              { backgroundColor: color },
+            ]}
           />
           
           {/* Pattern for phaseable walls */}
           {hazard.phaseable && (
             <>
-              <Rect
-                x={hazard.position.x + 5}
-                y={screenY + 5}
-                width={(hazard.width || 60) - 10}
-                height={2}
-                color="rgba(255,255,255,0.3)"
-              />
-              <Rect
-                x={hazard.position.x + 5}
-                y={screenY + 12}
-                width={(hazard.width || 60) - 10}
-                height={2}
-                color="rgba(255,255,255,0.3)"
-              />
+              <View style={[styles.wallStripe, { top: 5 }]} />
+              <View style={[styles.wallStripe, { top: 12 }]} />
             </>
           )}
-        </Group>
+        </View>
       );
     case 'drone':
       return (
-        <Circle
-          cx={hazard.position.x}
-          cy={screenY}
-          r={hazard.radius}
-          color="#ff6600"
+        <View
+          style={[
+            styles.droneBody,
+            {
+              left: hazard.position.x - hazard.radius,
+              top: screenY - hazard.radius,
+              width: hazard.radius * 2,
+              height: hazard.radius * 2,
+            },
+          ]}
         />
       );
     default:
@@ -338,8 +330,103 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a1a',
+    overflow: 'hidden',
   },
-  canvas: {
+  gridLineH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(100, 100, 255, 0.1)',
+  },
+  gridLineV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(100, 100, 255, 0.05)',
+  },
+  playerContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chargeRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    borderWidth: 3,
+  },
+  phaseGlow: {
+    position: 'absolute',
+    width: '120%',
+    height: '120%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 0, 255, 0.3)',
+  },
+  playerCore: {
+    borderRadius: 999,
+    shadowColor: '#00ffff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  playerInnerGlow: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  pickupContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickupGlow: {
+    position: 'absolute',
+    borderRadius: 999,
+    opacity: 0.3,
+  },
+  pickupCore: {
+    borderRadius: 999,
+  },
+  shardShape: {
+    width: 12,
+    height: 20,
+    borderRadius: 3,
+    transform: [{ rotate: '15deg' }],
+  },
+  wallContainer: {
+    position: 'absolute',
+    overflow: 'hidden',
+    borderRadius: 5,
+  },
+  wallGlow: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 8,
+    opacity: 0.3,
+  },
+  wallBody: {
     flex: 1,
+    borderRadius: 3,
+  },
+  wallStripe: {
+    position: 'absolute',
+    left: 5,
+    right: 5,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  droneBody: {
+    position: 'absolute',
+    backgroundColor: '#ff6600',
+    borderRadius: 999,
   },
 });
