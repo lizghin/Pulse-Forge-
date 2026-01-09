@@ -330,7 +330,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       score: state.score,
       duration: state.maxTime - state.timer,
       segment_reached: Math.floor(state.distance / 100),
-      death_cause: state.phase === 'gameOver' ? 'collision' : null,
+      death_cause: state.phase === 'ended' ? 'collision' : null,
       perfect_count: state.perfectPulses,
       near_miss_count: state.masteryStats.nearMisses,
       blueprints_earned_total: rewards.totalBlueprints,
