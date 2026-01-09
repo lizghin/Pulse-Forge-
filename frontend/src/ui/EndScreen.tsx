@@ -1,4 +1,4 @@
-// End Screen - Run summary with Mastery Progress
+// End Screen with Blueprints & Mastery Progress
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -45,21 +45,21 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
     masteryStats,
     persistentMastery,
     newUnlocks,
+    runRewards,
   } = useGameStore();
   
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   
-  // Calculate XP gained this run
   const xpGained = calculateRunMasteryXP(masteryStats);
   
   // Animation values
   const timingProgress = useSharedValue(0);
   const riskProgress = useSharedValue(0);
   const buildProgress = useSharedValue(0);
+  const blueprintCount = useSharedValue(0);
   const unlockScale = useSharedValue(0);
   
   useEffect(() => {
-    // Animate progress bars
     const timingTarget = getMasteryProgressToNext(persistentMastery.progress.timing);
     const riskTarget = getMasteryProgressToNext(persistentMastery.progress.risk);
     const buildTarget = getMasteryProgressToNext(persistentMastery.progress.build);
@@ -68,7 +68,11 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
     riskProgress.value = withDelay(500, withTiming(riskTarget, { duration: 800 }));
     buildProgress.value = withDelay(700, withTiming(buildTarget, { duration: 800 }));
     
-    // Show unlock modal if new unlocks
+    // Animate blueprint counter
+    if (runRewards) {
+      blueprintCount.value = withDelay(900, withTiming(runRewards.totalBlueprints, { duration: 1000 }));
+    }
+    
     if (newUnlocks.length > 0) {
       setTimeout(() => {
         setShowUnlockModal(true);
@@ -99,7 +103,6 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Title */}
         <Text style={styles.title}>RUN COMPLETE</Text>
 
         {/* Score */}
@@ -107,6 +110,44 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
           <Text style={styles.scoreLabel}>CORE SCORE</Text>
           <Text style={styles.scoreValue}>{score.toLocaleString()}</Text>
         </View>
+
+        {/* Blueprint Rewards */}
+        {runRewards && (
+          <View style={styles.blueprintSection}>
+            <View style={styles.blueprintHeader}>
+              <Ionicons name="cube" size={24} color="#00aaff" />
+              <Text style={styles.blueprintTitle}>BLUEPRINTS EARNED</Text>
+            </View>
+            <Text style={styles.blueprintTotal}>+{runRewards.totalBlueprints}</Text>
+            <View style={styles.blueprintBreakdown}>
+              <View style={styles.bpItem}>
+                <Text style={styles.bpLabel}>Base</Text>
+                <Text style={styles.bpValue}>+{runRewards.baseBlueprints}</Text>
+              </View>
+              {runRewards.timingBonus > 0 && (
+                <View style={styles.bpItem}>
+                  <Ionicons name="flash" size={14} color="#ffaa00" />
+                  <Text style={[styles.bpValue, { color: '#ffaa00' }]}>+{runRewards.timingBonus}</Text>
+                </View>
+              )}
+              {runRewards.riskBonus > 0 && (
+                <View style={styles.bpItem}>
+                  <Ionicons name="flame" size={14} color="#ff4444" />
+                  <Text style={[styles.bpValue, { color: '#ff4444' }]}>+{runRewards.riskBonus}</Text>
+                </View>
+              )}
+              {runRewards.buildBonus > 0 && (
+                <View style={styles.bpItem}>
+                  <Ionicons name="construct" size={14} color="#00aaff" />
+                  <Text style={[styles.bpValue, { color: '#00aaff' }]}>+{runRewards.buildBonus}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.totalBlueprints}>
+              Total: {persistentMastery.blueprints} Blueprints
+            </Text>
+          </View>
+        )}
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
@@ -120,7 +161,7 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
 
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: 'rgba(255,170,0,0.2)' }]}>
-              <Ionicons name="flash" size={24} color="#ffaa00" />
+              <Ionicons name="flash" size={20} color="#ffaa00" />
             </View>
             <Text style={styles.statValue}>{perfectPulses}</Text>
             <Text style={styles.statLabel}>Perfect</Text>
@@ -128,22 +169,22 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
 
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: 'rgba(255,68,68,0.2)' }]}>
-              <Ionicons name="flame" size={24} color="#ff4444" />
+              <Ionicons name="flame" size={20} color="#ff4444" />
             </View>
             <Text style={styles.statValue}>{masteryStats.nearMisses}</Text>
             <Text style={styles.statLabel}>Near Miss</Text>
           </View>
         </View>
 
-        {/* Mastery Progress Section */}
+        {/* Mastery Progress */}
         <View style={styles.masterySection}>
           <Text style={styles.sectionTitle}>MASTERY PROGRESS</Text>
           
-          {/* Timing Mastery */}
+          {/* Timing */}
           <View style={styles.masteryTrack}>
             <View style={styles.masteryHeader}>
               <View style={styles.masteryLabel}>
-                <Ionicons name="flash" size={18} color={MASTERY_TRACKS.timing.color} />
+                <Ionicons name="flash" size={16} color={MASTERY_TRACKS.timing.color} />
                 <Text style={[styles.masteryName, { color: MASTERY_TRACKS.timing.color }]}>
                   {MASTERY_TRACKS.timing.name}
                 </Text>
@@ -164,14 +205,13 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
                 ]} 
               />
             </View>
-            <Text style={styles.masteryDesc}>{MASTERY_TRACKS.timing.description}</Text>
           </View>
           
-          {/* Risk Mastery */}
+          {/* Risk */}
           <View style={styles.masteryTrack}>
             <View style={styles.masteryHeader}>
               <View style={styles.masteryLabel}>
-                <Ionicons name="flame" size={18} color={MASTERY_TRACKS.risk.color} />
+                <Ionicons name="flame" size={16} color={MASTERY_TRACKS.risk.color} />
                 <Text style={[styles.masteryName, { color: MASTERY_TRACKS.risk.color }]}>
                   {MASTERY_TRACKS.risk.name}
                 </Text>
@@ -192,14 +232,13 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
                 ]} 
               />
             </View>
-            <Text style={styles.masteryDesc}>{MASTERY_TRACKS.risk.description}</Text>
           </View>
           
-          {/* Build Mastery */}
+          {/* Build */}
           <View style={styles.masteryTrack}>
             <View style={styles.masteryHeader}>
               <View style={styles.masteryLabel}>
-                <Ionicons name="construct" size={18} color={MASTERY_TRACKS.build.color} />
+                <Ionicons name="construct" size={16} color={MASTERY_TRACKS.build.color} />
                 <Text style={[styles.masteryName, { color: MASTERY_TRACKS.build.color }]}>
                   {MASTERY_TRACKS.build.name}
                 </Text>
@@ -220,7 +259,6 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
                 ]} 
               />
             </View>
-            <Text style={styles.masteryDesc}>{MASTERY_TRACKS.build.description}</Text>
           </View>
         </View>
 
@@ -238,35 +276,26 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
               ))}
             </View>
             <Text style={styles.categoriesUsed}>
-              {masteryStats.categoriesUsed.size}/5 categories used
+              {masteryStats.categoriesUsed.size}/5 categories
             </Text>
           </View>
         )}
 
         {/* Actions */}
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={onRetry}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="refresh" size={24} color="#0a0a1a" />
+          <TouchableOpacity style={styles.retryButton} onPress={onRetry} activeOpacity={0.8}>
+            <Ionicons name="refresh" size={22} color="#0a0a1a" />
             <Text style={styles.retryText}>RETRY</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.homeButton}
-            onPress={onHome}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="home-outline" size={24} color="#888" />
+          <TouchableOpacity style={styles.homeButton} onPress={onHome} activeOpacity={0.8}>
+            <Ionicons name="home-outline" size={22} color="#888" />
             <Text style={styles.homeText}>HOME</Text>
           </TouchableOpacity>
         </View>
 
         {/* Run Stats */}
         <View style={styles.runStatsSection}>
-          <Text style={styles.runStatsTitle}>RUN STATISTICS</Text>
           <View style={styles.runStatsGrid}>
             <View style={styles.runStatItem}>
               <Text style={styles.runStatValue}>{Math.floor(distance)}</Text>
@@ -278,11 +307,11 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
             </View>
             <View style={styles.runStatItem}>
               <Text style={styles.runStatValue}>{masteryStats.phaseThroughs}</Text>
-              <Text style={styles.runStatLabel}>Phase Throughs</Text>
+              <Text style={styles.runStatLabel}>Phases</Text>
             </View>
             <View style={styles.runStatItem}>
               <Text style={styles.runStatValue}>{Math.floor(masteryStats.lowHpSurvivalTime)}s</Text>
-              <Text style={styles.runStatLabel}>Low HP Time</Text>
+              <Text style={styles.runStatLabel}>Low HP</Text>
             </View>
           </View>
         </View>
@@ -293,14 +322,14 @@ export function EndScreen({ onRetry, onHome }: EndScreenProps) {
         <View style={styles.unlockOverlay}>
           <Animated.View style={[styles.unlockModal, unlockAnimStyle]}>
             <View style={styles.unlockIcon}>
-              <Ionicons name="star" size={48} color="#ffaa00" />
+              <Ionicons name="star" size={40} color="#ffaa00" />
             </View>
             <Text style={styles.unlockTitle}>NEW UNLOCK!</Text>
             <Text style={styles.unlockSubtitle}>Mastery rewards earned</Text>
             
             {newUnlocks.map((unlock) => (
               <View key={unlock} style={styles.unlockItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#00ff88" />
+                <Ionicons name="checkmark-circle" size={18} color="#00ff88" />
                 <Text style={styles.unlockName}>
                   {unlock.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                 </Text>
@@ -326,67 +355,121 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a1a',
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
     color: '#fff',
     letterSpacing: 4,
-    marginBottom: 20,
-    marginTop: 10,
+    marginBottom: 16,
+    marginTop: 8,
   },
   scoreSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   scoreLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#666',
     letterSpacing: 2,
     marginBottom: 4,
   },
   scoreValue: {
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: '900',
     color: '#00ffff',
+  },
+  blueprintSection: {
+    width: '100%',
+    backgroundColor: 'rgba(0,170,255,0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,170,255,0.3)',
+  },
+  blueprintHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  blueprintTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00aaff',
+    letterSpacing: 2,
+  },
+  blueprintTotal: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#00aaff',
+    textAlign: 'center',
+  },
+  blueprintBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  bpItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bpLabel: {
+    fontSize: 11,
+    color: '#888',
+  },
+  bpValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  totalBlueprints: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
   },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: 24,
+    gap: 12,
+    marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 12,
+    padding: 10,
     borderRadius: 12,
-    minWidth: 80,
+    minWidth: 70,
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   shardIconSmall: {
-    width: 10,
-    height: 16,
+    width: 8,
+    height: 14,
     backgroundColor: '#00ff88',
     borderRadius: 2,
     transform: [{ rotate: '15deg' }],
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#fff',
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666',
     marginTop: 2,
   },
@@ -394,128 +477,123 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    padding: 14,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#666',
     letterSpacing: 2,
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
   masteryTrack: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   masteryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   masteryLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   masteryName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   masteryXp: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   xpGained: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#00ff88',
   },
   masteryLevel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#fff',
     backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   progressBarBg: {
     width: '100%',
-    height: 8,
+    height: 6,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
-  },
-  masteryDesc: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 4,
+    borderRadius: 3,
   },
   buildSection: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   upgradesList: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
   },
   upgradeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    gap: 10,
+    paddingVertical: 5,
+    gap: 8,
   },
   upgradeNumber: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'rgba(0,255,255,0.2)',
     color: '#00ffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
   },
   upgradeName: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#fff',
     flex: 1,
   },
   upgradeCategory: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666',
     textTransform: 'uppercase',
   },
   categoriesUsed: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#888',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 16,
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#00ffff',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 6,
   },
   retryText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0a0a1a',
   },
@@ -523,29 +601,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    gap: 6,
   },
   homeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#888',
   },
   runStatsSection: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
-    padding: 16,
-  },
-  runStatsTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#666',
-    letterSpacing: 2,
-    marginBottom: 12,
-    textAlign: 'center',
+    borderRadius: 12,
+    padding: 12,
   },
   runStatsGrid: {
     flexDirection: 'row',
@@ -555,18 +625,17 @@ const styles = StyleSheet.create({
   runStatItem: {
     alignItems: 'center',
     width: '45%',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   runStatValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#fff',
   },
   runStatLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666',
   },
-  // Unlock Modal
   unlockOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',
@@ -575,60 +644,60 @@ const styles = StyleSheet.create({
   },
   unlockModal: {
     backgroundColor: '#1a1a2e',
-    borderRadius: 24,
-    padding: 32,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
     width: SCREEN_WIDTH - 48,
-    maxWidth: 340,
+    maxWidth: 320,
     borderWidth: 2,
     borderColor: '#ffaa00',
   },
   unlockIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(255,170,0,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   unlockTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffaa00',
     letterSpacing: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   unlockSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#888',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   unlockItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
     width: '100%',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   unlockName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
   unlockDismiss: {
     backgroundColor: '#ffaa00',
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 12,
-    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 10,
+    marginTop: 12,
   },
   unlockDismissText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0a0a1a',
   },
