@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pulse Forge Analytics Dashboard
 
-## Getting Started
+Minimal analytics dashboard for game tuning.
 
-First, run the development server:
+## Quick Start (< 20 lines)
 
 ```bash
+# 1. Start MongoDB (if not running)
+mongod --dbpath /data/db &
+
+# 2. Start Backend
+cd /app/backend
+pip install -r requirements.txt
+uvicorn server:app --host 0.0.0.0 --port 8001 &
+
+# 3. Start Dashboard
+cd /app/dashboard
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# 4. Generate demo data
+curl -X POST "http://localhost:8001/api/analytics/demo/generate?days=7&runs_per_day=50" \
+  -H "X-API-Key: pulse-forge-dashboard-2024"
+
+# 5. Open http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## API Keys
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Ingestion: `pulse-forge-ingest-2024`
+- Dashboard: `pulse-forge-dashboard-2024`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Endpoints
 
-## Learn More
+- `POST /api/analytics/events/batch` - Ingest events
+- `GET /api/analytics/dashboard/stats` - Get dashboard data
+- `GET /api/analytics/dashboard/export/runs` - CSV export
+- `POST /api/analytics/demo/generate` - Generate demo data
+- `DELETE /api/analytics/demo/clear` - Clear all data
 
-To learn more about Next.js, take a look at the following resources:
+## Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 15 + TypeScript
+- Tailwind CSS + shadcn/ui
+- Recharts + TanStack Query
+- FastAPI + MongoDB
