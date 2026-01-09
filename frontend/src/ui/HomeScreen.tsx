@@ -113,6 +113,19 @@ export function HomeScreen({ onPlay, onSettings, onUnlocks, onForge, onMySkins }
           </TouchableOpacity>
         </View>
 
+        {/* Forge Buttons */}
+        <View style={styles.forgeButtons}>
+          <TouchableOpacity style={styles.forgeButton} onPress={onForge}>
+            <Ionicons name="color-wand" size={20} color="#ffaa00" />
+            <Text style={styles.forgeButtonText}>Forge Core</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.forgeButton} onPress={onMySkins}>
+            <Ionicons name="sparkles" size={20} color="#ff00ff" />
+            <Text style={styles.forgeButtonText}>My Skins</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* High Score */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
