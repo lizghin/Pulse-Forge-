@@ -146,7 +146,7 @@ function GridLines({ cameraY }: { cameraY: number }) {
   return <>{lines}</>;
 }
 
-function PlayerView({ player, cameraY }: { player: Player; cameraY: number }) {
+function PlayerView({ player, cameraY, equippedSkin }: { player: Player; cameraY: number; equippedSkin?: SkinRecipe | null }) {
   const screenY = player.position.y - cameraY;
   const chargeRatio = player.charge / player.maxCharge;
   const outerRadius = player.radius + chargeRatio * 15;
@@ -156,8 +156,51 @@ function PlayerView({ player, cameraY }: { player: Player; cameraY: number }) {
   
   if (!visible) return null;
   
-  const baseColor = player.phaseActive ? '#ff00ff' : '#00ffff';
+  // Get colors from equipped skin or use defaults
+  const skinColors = getSkinColors(equippedSkin);
+  const baseColor = player.phaseActive ? skinColors.phaseColor : skinColors.coreColor;
   
+  // If we have an equipped skin, render the SVG version
+  if (equippedSkin) {
+    return (
+      <View
+        style={[
+          styles.playerContainer,
+          {
+            left: player.position.x - outerRadius,
+            top: screenY - outerRadius,
+            width: outerRadius * 2,
+            height: outerRadius * 2,
+          },
+        ]}
+      >
+        {/* Charge ring */}
+        {chargeRatio > 0 && (
+          <View
+            style={[
+              styles.chargeRing,
+              {
+                borderColor: skinColors.coreColor,
+                opacity: 0.3 + chargeRatio * 0.4,
+              },
+            ]}
+          />
+        )}
+        
+        {/* Phase glow */}
+        {player.phaseActive && (
+          <View style={[styles.phaseGlow, { backgroundColor: `${skinColors.phaseColor}4D` }]} />
+        )}
+        
+        {/* Custom Skin */}
+        <View style={styles.skinContainer}>
+          <SkinPreview recipe={equippedSkin} size={player.radius * 2} animated={false} />
+        </View>
+      </View>
+    );
+  }
+  
+  // Default player rendering
   return (
     <View
       style={[
