@@ -1,7 +1,7 @@
 // Pulse Forge - Main Game Entry with Forge Your Core Feature
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, StatusBar, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Platform, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 
@@ -22,13 +22,18 @@ import { getEquippedSkin, loadForgedSkins } from '../src/forge/skinForge';
 
 type Screen = 'home' | 'game' | 'unlocks' | 'forge' | 'myskins';
 
+// Debug mode - set to true for development
+const DEBUG_MODE = __DEV__ || false;
+
 export default function PulseForge() {
   const engineRef = useRef<GameEngine | null>(null);
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [equippedSkin, setEquippedSkin] = useState<SkinRecipe | null>(null);
+  const [lastSaveStatus, setLastSaveStatus] = useState<string>('none');
+  const [showDebug, setShowDebug] = useState(false);
   
-  const { phase, setPhase, startGame, resetGame, selectUpgrade, loadMastery } = useGameStore();
+  const { phase, setPhase, startGame, resetGame, selectUpgrade, loadMastery, persistentMastery } = useGameStore();
 
   // Initialize engine and load data
   useEffect(() => {
@@ -49,6 +54,8 @@ export default function PulseForge() {
       const skins = await loadForgedSkins();
       const skin = skins.find(s => s.id === equippedId);
       setEquippedSkin(skin || null);
+    } else {
+      setEquippedSkin(null);
     }
   };
 
@@ -79,23 +86,34 @@ export default function PulseForge() {
             if (effect.modifier === 'add') player.phaseDuration += effect.value;
             else player.phaseDuration *= effect.value;
             break;
+          case 'phaseCooldown':
+            if (effect.modifier === 'add') player.phaseCooldown += effect.value;
+            else player.phaseCooldown *= effect.value;
+            break;
           case 'chargeSpeed':
             if (effect.modifier === 'add') player.chargeSpeed += effect.value;
             else player.chargeSpeed *= effect.value;
             break;
-          case 'dashPower':
-            if (effect.modifier === 'add') player.dashPower += effect.value;
-            else player.dashPower *= effect.value;
+          case 'maxCharge':
+            if (effect.modifier === 'add') player.maxCharge += effect.value;
+            else player.maxCharge *= effect.value;
+            break;
+          case 'dashForce':
+            if (effect.modifier === 'add') player.dashForce += effect.value;
+            else player.dashForce *= effect.value;
+            break;
+          case 'hp':
+            if (effect.modifier === 'add') player.hp = Math.min(player.maxHp, player.hp + effect.value);
+            else player.hp = Math.min(player.maxHp, Math.floor(player.hp * effect.value));
             break;
           case 'maxHp':
-            if (effect.modifier === 'add') {
-              player.maxHp += effect.value;
-              player.hp += effect.value;
-            }
+            if (effect.modifier === 'add') player.maxHp += effect.value;
+            else player.maxHp = Math.floor(player.maxHp * effect.value);
+            player.hp = Math.min(player.maxHp, player.hp);
             break;
-          case 'magnetRange':
-            if (effect.modifier === 'add') player.magnetRange += effect.value;
-            else player.magnetRange *= effect.value;
+          case 'invincibilityTime':
+            if (effect.modifier === 'add') player.invincibilityTime += effect.value;
+            else player.invincibilityTime *= effect.value;
             break;
         }
       });
@@ -117,9 +135,15 @@ export default function PulseForge() {
 
   const handleHome = useCallback(async () => {
     engineRef.current?.stop();
-    // Ensure mastery data is saved before navigating
-    // The endRun() should already be complete, but reload to ensure fresh data
+    
+    // Wait a moment to ensure any pending endRun() save is complete
+    setLastSaveStatus('saving...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Reload mastery data to ensure we have the latest saved state
     await loadMastery();
+    setLastSaveStatus('saved ✓');
+    
     resetGame();
     setCurrentScreen('home');
   }, [resetGame, loadMastery]);
@@ -140,20 +164,28 @@ export default function PulseForge() {
     setCurrentScreen('myskins');
   }, []);
 
-  const handleBackFromUnlocks = useCallback(() => {
+  const handleBackFromUnlocks = useCallback(async () => {
+    // Reload mastery when leaving unlocks in case purchases were made
+    await loadMastery();
     setCurrentScreen('home');
-  }, []);
+  }, [loadMastery]);
 
   const handleBackFromForge = useCallback(() => {
+    loadEquippedSkin();
     setCurrentScreen('home');
   }, []);
 
   const handleBackFromMySkins = useCallback(() => {
+    loadEquippedSkin();
     setCurrentScreen('home');
   }, []);
 
   const handleSkinCreated = useCallback((recipe: SkinRecipe) => {
     setEquippedSkin(recipe);
+  }, []);
+
+  const handleSkinEquipped = useCallback(async () => {
+    await loadEquippedSkin();
   }, []);
 
   const handleForgeFromMySkins = useCallback(() => {
@@ -163,6 +195,35 @@ export default function PulseForge() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0a1a" />
+      
+      {/* Debug Toggle (DEV only) */}
+      {DEBUG_MODE && (
+        <TouchableOpacity 
+          style={styles.debugToggle}
+          onPress={() => setShowDebug(!showDebug)}
+        >
+          <Text style={styles.debugToggleText}>🔧</Text>
+        </TouchableOpacity>
+      )}
+      
+      {/* Debug Panel */}
+      {DEBUG_MODE && showDebug && (
+        <View style={styles.debugPanel}>
+          <Text style={styles.debugTitle}>DEBUG INFO</Text>
+          <Text style={styles.debugText}>
+            Skin: {equippedSkin ? `${equippedSkin.baseShape} (${equippedSkin.id.slice(0,8)}...)` : 'default'}
+          </Text>
+          <Text style={styles.debugText}>
+            Blueprints: {persistentMastery?.blueprints || 0}
+          </Text>
+          <Text style={styles.debugText}>
+            Last Save: {lastSaveStatus}
+          </Text>
+          <Text style={styles.debugText}>
+            Screen: {currentScreen} | Phase: {phase}
+          </Text>
+        </View>
+      )}
       
       {/* Home Screen */}
       {currentScreen === 'home' && (
@@ -193,6 +254,7 @@ export default function PulseForge() {
         <MySkinsScreen 
           onBack={handleBackFromMySkins}
           onForgeNew={handleForgeFromMySkins}
+          onSkinEquipped={handleSkinEquipped}
         />
       )}
 
@@ -236,5 +298,44 @@ const styles = StyleSheet.create({
   endOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0a0a1a',
+  },
+  debugToggle: {
+    position: 'absolute',
+    top: 50,
+    right: 10,
+    zIndex: 9999,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugToggleText: {
+    fontSize: 20,
+  },
+  debugPanel: {
+    position: 'absolute',
+    top: 100,
+    right: 10,
+    zIndex: 9998,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#00ff88',
+    minWidth: 200,
+  },
+  debugTitle: {
+    color: '#00ff88',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 10,
+    marginBottom: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
