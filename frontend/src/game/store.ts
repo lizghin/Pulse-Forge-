@@ -362,6 +362,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     newMastery.blueprints -= cost;
     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, upgradeId];
     
+    // Track blueprint spending
+    Analytics.trackBlueprintSpent({
+      item_type: 'upgrade',
+      item_id: upgradeId,
+      cost: cost,
+    });
+    
     await saveMasteryData(newMastery);
     set({ persistentMastery: newMastery });
     return true;
