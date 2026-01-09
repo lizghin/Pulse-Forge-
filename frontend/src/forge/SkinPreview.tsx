@@ -245,8 +245,6 @@ function AuraLayer({ recipe, center, radius }: {
                 ry={radius * 0.25}
                 fill={i % 2 === 0 ? recipe.primaryColor : recipe.secondaryColor}
                 opacity={0.6}
-                rotation={angle}
-                origin={`${x}, ${y}`}
               />
             );
           })}
