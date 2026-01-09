@@ -85,3 +85,4 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
+dashboard/node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node
