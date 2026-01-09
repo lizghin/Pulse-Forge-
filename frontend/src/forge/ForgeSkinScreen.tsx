@@ -1,4 +1,5 @@
 // Forge Skin Screen - Create custom skins from text prompts
+// Fixed: Action buttons moved outside ScrollView for web compatibility
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -22,6 +23,8 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { SkinPreview } from './SkinPreview';
 import {
@@ -46,17 +49,30 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   const [variations, setVariations] = useState<SkinRecipe[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Animation values for cards
   const card0Scale = useSharedValue(1);
   const card1Scale = useSharedValue(1);
   const card2Scale = useSharedValue(1);
+  const toastOpacity = useSharedValue(0);
   
   const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(style);
     }
   };
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    toastOpacity.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withTiming(1, { duration: 1500 }),
+      withTiming(0, { duration: 300 })
+    );
+    setTimeout(() => setToast(null), 2000);
+  }, [toastOpacity]);
 
   const handleGenerate = useCallback(async () => {
     setError(null);
@@ -69,6 +85,7 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
       return;
     }
     
+    console.log('[Forge] Generating skins for prompt:', prompt);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
     setVariations([]);
@@ -79,12 +96,14 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
     
     // Generate 3 variations
     const newVariations = generateSkinVariations(prompt, 3);
+    console.log('[Forge] Generated', newVariations.length, 'variations');
     setVariations(newVariations);
     setIsGenerating(false);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
   }, [prompt]);
 
-  const handleSelectSkin = useCallback(async (index: number) => {
+  const handleSelectSkin = useCallback((index: number) => {
+    console.log('[Forge] Selected skin index:', index);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     // Animate card scale
     const scales = [card0Scale, card1Scale, card2Scale];
@@ -95,45 +114,58 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
     setSelectedIndex(index);
   }, [card0Scale, card1Scale, card2Scale]);
 
+  // Main handler for using skin - with multiple fallbacks
   const handleUseSkin = useCallback(async () => {
+    console.log('[Forge] handleUseSkin called! selectedIndex:', selectedIndex);
+    
     if (selectedIndex === null) {
-      console.log('[Forge] No skin selected');
+      console.log('[Forge] No skin selected, aborting');
       return;
     }
     
-    console.log('[Forge] Using skin at index:', selectedIndex);
+    if (isSaving) {
+      console.log('[Forge] Already saving, aborting');
+      return;
+    }
+    
+    setIsSaving(true);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+    
     const selected = variations[selectedIndex];
+    console.log('[Forge] Using skin:', selected.id, selected.baseShape);
     
     try {
-      console.log('[Forge] Saving skin:', selected.id);
+      // Save the skin
+      console.log('[Forge] Saving skin...');
       await saveForgedSkin(selected);
-      console.log('[Forge] Skin saved');
+      console.log('[Forge] Skin saved!');
       
+      // Set as equipped
+      console.log('[Forge] Setting as equipped...');
       await setEquippedSkin(selected.id);
-      console.log('[Forge] Skin equipped');
+      console.log('[Forge] Skin equipped!');
       
+      // Notify parent
       onSkinCreated(selected);
-      console.log('[Forge] onSkinCreated called');
       
-      // Navigate back after save
-      console.log('[Forge] Navigating back, Platform:', Platform.OS);
-      if (Platform.OS === 'web') {
+      // Show success toast
+      showToast('Equipped ✓');
+      console.log('[Forge] Success! Navigating back...');
+      
+      // Navigate back after short delay to show toast
+      setTimeout(() => {
         onBack();
-      } else {
-        Alert.alert(
-          'Skin Forged!',
-          'Your custom skin has been created and equipped.',
-          [{ text: 'Awesome!', onPress: onBack }]
-        );
-      }
+      }, 800);
+      
     } catch (err) {
       console.error('[Forge] Error saving skin:', err);
       setError('Failed to save skin. Please try again.');
+      setIsSaving(false);
     }
-  }, [selectedIndex, variations, onBack, onSkinCreated]);
+  }, [selectedIndex, variations, onBack, onSkinCreated, isSaving, showToast]);
 
   const handleExamplePress = useCallback((example: string) => {
+    console.log('[Forge] Example pressed:', example);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPrompt(example);
     setError(null);
@@ -144,13 +176,19 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   const handleMintNFT = useCallback(() => {
     if (selectedIndex === null) return;
     
+    console.log('[Forge] Mint NFT pressed');
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Mint as NFT',
-      'NFT minting on testnet coming soon! For now, your skin is saved locally and usable in-game.',
-      [{ text: 'Got it!' }]
-    );
-  }, [selectedIndex]);
+    
+    if (Platform.OS === 'web') {
+      showToast('NFT minting coming soon!');
+    } else {
+      Alert.alert(
+        'Mint as NFT',
+        'NFT minting on testnet coming soon! For now, your skin is saved locally and usable in-game.',
+        [{ text: 'Got it!' }]
+      );
+    }
+  }, [selectedIndex, showToast]);
   
   // Animated styles for cards
   const card0Style = useAnimatedStyle(() => ({
@@ -162,9 +200,57 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
   const card2Style = useAnimatedStyle(() => ({
     transform: [{ scale: card2Scale.value }],
   }));
+  
+  const toastStyle = useAnimatedStyle(() => ({
+    opacity: toastOpacity.value,
+  }));
+
+  // Web-safe button component with multiple event handlers
+  const ActionButton = ({ onAction, style, children, disabled }: {
+    onAction: () => void;
+    style: any;
+    children: React.ReactNode;
+    disabled?: boolean;
+  }) => {
+    const handlePress = () => {
+      console.log('[ActionButton] onPress fired');
+      if (!disabled) onAction();
+    };
+    
+    const handlePointerUp = () => {
+      console.log('[ActionButton] onPointerUp fired');
+      if (!disabled) onAction();
+    };
+    
+    // Use Pressable with multiple event handlers for reliability
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          style,
+          pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+          disabled && { opacity: 0.5 }
+        ]}
+        onPress={handlePress}
+        // @ts-ignore - Web fallback
+        onPointerUp={Platform.OS === 'web' ? handlePointerUp : undefined}
+        disabled={disabled}
+        accessibilityRole="button"
+      >
+        {children}
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Toast Notification */}
+      {toast && (
+        <Animated.View style={[styles.toast, toastStyle]}>
+          <Ionicons name="checkmark-circle" size={20} color="#00ff88" />
+          <Text style={styles.toastText}>{toast}</Text>
+        </Animated.View>
+      )}
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -177,7 +263,11 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {/* Scrollable Content */}
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Description */}
         <Text style={styles.description}>
           Describe your dream core skin and we'll forge it for you.
@@ -211,7 +301,7 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
 
         {/* Generate Button */}
         <TouchableOpacity
-          style={[styles.generateButton, (!prompt.trim() || isGenerating) && styles.buttonDisabled]}
+          style={[styles.generateButton, (!prompt.trim() || isGenerating) && styles.generateButtonDisabled]}
           onPress={handleGenerate}
           disabled={!prompt.trim() || isGenerating}
         >
@@ -226,24 +316,20 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
         </TouchableOpacity>
 
         {/* Example Prompts */}
-        {variations.length === 0 && (
-          <View style={styles.examplesSection}>
-            <Text style={styles.examplesTitle}>TRY THESE EXAMPLES</Text>
-            <View style={styles.examplesGrid}>
-              {PROMPT_EXAMPLES.slice(0, 6).map((example, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.exampleChip}
-                  onPress={() => handleExamplePress(example)}
-                >
-                  <Text style={styles.exampleText} numberOfLines={2}>
-                    {example}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        <View style={styles.examplesSection}>
+          <Text style={styles.examplesTitle}>TRY THESE EXAMPLES</Text>
+          <View style={styles.examplesGrid}>
+            {PROMPT_EXAMPLES.slice(0, 8).map((example, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.exampleChip}
+                onPress={() => handleExamplePress(example)}
+              >
+                <Text style={styles.exampleText} numberOfLines={1}>{example}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        )}
+        </View>
 
         {/* Generated Variations */}
         {variations.length > 0 && (
@@ -279,29 +365,6 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
               })}
             </View>
 
-            {/* Action Buttons */}
-            {selectedIndex !== null && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={styles.useSkinButton}
-                  onPress={handleUseSkin}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={20} color="#0a0a1a" />
-                  <Text style={styles.useSkinText}>USE THIS SKIN</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.mintButton}
-                  onPress={handleMintNFT}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="diamond" size={18} color="#ffaa00" />
-                  <Text style={styles.mintText}>MINT NFT</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             {/* Selected Skin Details */}
             {selectedIndex !== null && (
               <View style={styles.detailsSection}>
@@ -316,14 +379,16 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
                     <Text style={styles.detailValue}>{variations[selectedIndex].auraType}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Particles</Text>
-                    <Text style={styles.detailValue}>{variations[selectedIndex].particleStyle}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>Outline</Text>
                     <Text style={styles.detailValue}>{variations[selectedIndex].outlineStyle}</Text>
                   </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Particles</Text>
+                    <Text style={styles.detailValue}>{variations[selectedIndex].particleStyle}</Text>
+                  </View>
                 </View>
+                
+                {/* Color Palette */}
                 <View style={styles.colorPalette}>
                   <View style={[styles.colorSwatch, { backgroundColor: variations[selectedIndex].primaryColor }]} />
                   <View style={[styles.colorSwatch, { backgroundColor: variations[selectedIndex].secondaryColor }]} />
@@ -333,15 +398,39 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
             )}
           </View>
         )}
-
-        {/* Info Section */}
-        <View style={styles.infoSection}>
-          <Ionicons name="information-circle" size={16} color="#666" />
-          <Text style={styles.infoText}>
-            Skins are cosmetic only. No gameplay advantage. Same prompt always generates the same skins.
-          </Text>
-        </View>
+        
+        {/* Spacer for fixed footer */}
+        {selectedIndex !== null && <View style={{ height: 100 }} />}
       </ScrollView>
+
+      {/* Fixed Footer with Action Buttons - OUTSIDE ScrollView for web compatibility */}
+      {selectedIndex !== null && (
+        <View style={styles.fixedFooter}>
+          <ActionButton
+            onAction={handleUseSkin}
+            style={styles.useSkinButton}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#0a0a1a" size="small" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#0a0a1a" />
+                <Text style={styles.useSkinText}>USE THIS SKIN</Text>
+              </>
+            )}
+          </ActionButton>
+
+          <ActionButton
+            onAction={handleMintNFT}
+            style={styles.mintButton}
+            disabled={isSaving}
+          >
+            <Ionicons name="diamond" size={18} color="#ffaa00" />
+            <Text style={styles.mintText}>MINT NFT</Text>
+          </ActionButton>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -350,6 +439,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a1a',
+  },
+  toast: {
+    position: 'absolute',
+    top: 100,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,255,136,0.2)',
+    borderWidth: 1,
+    borderColor: '#00ff88',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 1000,
+  },
+  toastText: {
+    color: '#00ff88',
+    fontWeight: '700',
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',
@@ -376,6 +485,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 20,
   },
   description: {
     fontSize: 14,
@@ -385,9 +495,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   inputContainer: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     marginBottom: 12,
   },
   input: {
@@ -398,22 +508,22 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 11,
-    color: '#666',
+    color: '#555',
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: 8,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,68,68,0.15)',
+    backgroundColor: 'rgba(255,68,68,0.1)',
+    padding: 12,
     borderRadius: 8,
-    padding: 10,
     marginBottom: 12,
     gap: 8,
   },
   errorText: {
-    fontSize: 13,
     color: '#ff4444',
+    fontSize: 13,
     flex: 1,
   },
   generateButton: {
@@ -426,9 +536,8 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
   },
-  buttonDisabled: {
-    backgroundColor: '#444',
-    opacity: 0.6,
+  generateButtonDisabled: {
+    opacity: 0.5,
   },
   generateText: {
     fontSize: 16,
@@ -477,24 +586,25 @@ const styles = StyleSheet.create({
   },
   variationsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
   },
   variationCard: {
-    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16,
     padding: 12,
-    width: (SCREEN_WIDTH - 64) / 3,
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
+    width: (SCREEN_WIDTH - 64) / 3,
   },
   variationSelected: {
     borderColor: '#00ff88',
     backgroundColor: 'rgba(0,255,136,0.1)',
   },
   variationLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
     marginTop: 8,
@@ -521,20 +631,33 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 2,
   },
-  actionButtons: {
+  fixedFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0a0a1a',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'center',
-    marginBottom: 20,
   },
   useSkinButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#00ff88',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,
+    flex: 1,
+    maxWidth: 200,
+    cursor: 'pointer',
   },
   useSkinText: {
     fontSize: 14,
@@ -544,13 +667,15 @@ const styles = StyleSheet.create({
   mintButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255,170,0,0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ffaa00',
     gap: 6,
+    cursor: 'pointer',
   },
   mintText: {
     fontSize: 13,
@@ -561,6 +686,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 12,
     padding: 16,
+    marginTop: 8,
   },
   detailsTitle: {
     fontSize: 11,
@@ -568,52 +694,36 @@ const styles = StyleSheet.create({
     color: '#666',
     letterSpacing: 2,
     marginBottom: 12,
-    textAlign: 'center',
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 12,
   },
   detailItem: {
-    width: '48%',
-    marginBottom: 8,
+    width: '45%',
   },
   detailLabel: {
     fontSize: 10,
-    color: '#666',
+    color: '#555',
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: 13,
     color: '#fff',
-    fontWeight: '600',
     textTransform: 'capitalize',
   },
   colorPalette: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 8,
+    marginTop: 16,
+    justifyContent: 'center',
   },
   colorSwatch: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.2)',
-  },
-  infoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 10,
-  },
-  infoText: {
-    fontSize: 11,
-    color: '#666',
-    flex: 1,
   },
 });
