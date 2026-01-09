@@ -6,16 +6,18 @@ import { View, StyleSheet, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { GameEngine } from './engine';
 import { useGameStore } from './store';
-import { Player, Pickup, Hazard } from './types';
+import { Player, Pickup, Hazard, SkinRecipe } from './types';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SkinPreview, getSkinColors } from '../forge/SkinPreview';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface GameCanvasProps {
   engine: GameEngine | null;
+  equippedSkin?: SkinRecipe | null;
 }
 
-export function GameCanvas({ engine }: GameCanvasProps) {
+export function GameCanvas({ engine, equippedSkin }: GameCanvasProps) {
   const [renderTick, setRenderTick] = useState(0);
   const phase = useGameStore((s) => s.phase);
   const animationRef = useRef<number | null>(null);
