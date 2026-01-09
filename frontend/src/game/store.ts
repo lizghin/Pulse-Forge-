@@ -1,20 +1,24 @@
-// Game state store using Zustand with Mastery System
+// Game state store with Blueprints Meta-Progression
 
 import { create } from 'zustand';
-import { GameState, Upgrade, MasteryStats, MasteryEvent, PersistentMastery } from './types';
+import { GameState, Upgrade, MasteryStats, MasteryEvent, PersistentMastery, RunRewards } from './types';
 import { getAvailableUpgrades, ALL_UPGRADES } from './data/upgrades';
 import { 
   loadMasteryData, 
   saveMasteryData, 
   calculateRunMasteryXP, 
-  checkUnlocks,
-  getMasteryLevel 
+  calculateRunBlueprints,
+  checkMasteryUnlocks,
+  getMasteryLevel,
+  COSMETIC_SKINS,
+  HAZARD_THEMES,
 } from './mastery';
 
 interface GameStore extends GameState {
-  // Persistent mastery
+  // Persistent mastery & blueprints
   persistentMastery: PersistentMastery;
   newUnlocks: string[];
+  runRewards: RunRewards | null;
   
   // Setters
   setPhase: (phase: GameState['phase']) => void;
@@ -46,8 +50,13 @@ interface GameStore extends GameState {
   // Multiplier
   setMultiplier: (mult: number) => void;
   
-  // Mastery
+  // Mastery & Blueprints
   loadMastery: () => Promise<void>;
+  purchaseUpgrade: (upgradeId: string, cost: number) => Promise<boolean>;
+  purchaseCosmetic: (cosmeticId: string, cost: number) => Promise<boolean>;
+  purchaseTheme: (themeId: string, cost: number) => Promise<boolean>;
+  selectSkin: (skinId: string) => Promise<void>;
+  selectTheme: (themeId: string) => Promise<void>;
 }
 
 const createInitialMasteryStats = (): MasteryStats => ({
@@ -82,14 +91,19 @@ const DEFAULT_PERSISTENT: PersistentMastery = {
   progress: { timing: 0, risk: 0, build: 0 },
   totalRuns: 0,
   highScore: 0,
+  blueprints: 0,
   unlockedUpgrades: [],
-  unlockedCosmetics: [],
+  unlockedCosmetics: ['default'],
+  unlockedThemes: ['default'],
+  selectedSkin: 'default',
+  selectedTheme: 'default',
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
   ...INITIAL_STATE,
   persistentMastery: DEFAULT_PERSISTENT,
   newUnlocks: [],
+  runRewards: null,
   
   setPhase: (phase) => set({ phase }),
   setTimer: (timer) => set({ timer }),
@@ -103,7 +117,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const newStats = { ...state.masteryStats };
     newStats.perfectPulses++;
     
-    // Add event
     const newEvent: MasteryEvent = {
       id: `pp_${Date.now()}`,
       type: 'perfect_pulse',
@@ -159,8 +172,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       newStats.rhythmStreak++;
       newStats.maxRhythmStreak = Math.max(newStats.maxRhythmStreak, newStats.rhythmStreak);
       
-      // Add event for milestones
-      if (newStats.rhythmStreak === 3 || newStats.rhythmStreak === 5 || newStats.rhythmStreak === 10) {
+      if (newStats.rhythmStreak === 3 || newStats.rhythmStreak === 5 || 
+          newStats.rhythmStreak === 10 || newStats.rhythmStreak === 20) {
         const newEvent: MasteryEvent = {
           id: `rs_${Date.now()}`,
           type: 'rhythm_streak',
@@ -183,7 +196,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const newStats = { ...state.masteryStats };
     newStats.lowHpSurvivalTime += time;
     
-    // Milestone events
     const prev = state.masteryStats.lowHpSurvivalTime;
     const curr = newStats.lowHpSurvivalTime;
     
@@ -215,7 +227,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     const availableUpgrades = getAvailableUpgrades(state.persistentMastery.unlockedUpgrades);
     
-    // Pick 3 random upgrades not already selected
     const available = availableUpgrades.filter(
       (u) => !state.selectedUpgrades.find((s) => s.id === u.id)
     );
@@ -234,13 +245,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const newStats = { ...state.masteryStats };
       newStats.categoriesUsed = new Set([...state.masteryStats.categoriesUsed, upgrade.category]);
       
-      // Check for synergy (multiple upgrades in same category)
       const sameCategoryCount = state.selectedUpgrades.filter(u => u.category === upgrade.category).length;
       if (sameCategoryCount > 0) {
         newStats.upgradesSynergized++;
       }
       
-      // Category bonus event
       if (newStats.categoriesUsed.size === 5) {
         const newEvent: MasteryEvent = {
           id: `cb_${Date.now()}`,
@@ -273,17 +282,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     recentEvents: [],
     persistentMastery: get().persistentMastery,
     newUnlocks: [],
+    runRewards: null,
   }),
   
   resetGame: () => set((state) => ({
     ...INITIAL_STATE,
     persistentMastery: state.persistentMastery,
     newUnlocks: [],
+    runRewards: null,
   })),
   
   endRun: async () => {
     const state = get();
+    
+    // Calculate XP
     const xpGained = calculateRunMasteryXP(state.masteryStats);
+    
+    // Calculate Blueprints
+    const rewards = calculateRunBlueprints(state.score, state.masteryStats);
     
     // Update persistent mastery
     const newMastery = { ...state.persistentMastery };
@@ -292,9 +308,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     newMastery.progress.build += xpGained.build;
     newMastery.totalRuns++;
     newMastery.highScore = Math.max(newMastery.highScore, state.score);
+    newMastery.blueprints += rewards.totalBlueprints;
     
-    // Check for new unlocks
-    const unlocks = checkUnlocks(newMastery);
+    // Check for new mastery unlocks
+    const unlocks = checkMasteryUnlocks(newMastery);
     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, ...unlocks];
     
     // Save to storage
@@ -303,6 +320,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       persistentMastery: newMastery,
       newUnlocks: unlocks,
+      runRewards: rewards,
     });
   },
   
@@ -311,5 +329,65 @@ export const useGameStore = create<GameStore>((set, get) => ({
   loadMastery: async () => {
     const mastery = await loadMasteryData();
     set({ persistentMastery: mastery });
+  },
+  
+  purchaseUpgrade: async (upgradeId: string, cost: number) => {
+    const state = get();
+    if (state.persistentMastery.blueprints < cost) return false;
+    if (state.persistentMastery.unlockedUpgrades.includes(upgradeId)) return false;
+    
+    const newMastery = { ...state.persistentMastery };
+    newMastery.blueprints -= cost;
+    newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, upgradeId];
+    
+    await saveMasteryData(newMastery);
+    set({ persistentMastery: newMastery });
+    return true;
+  },
+  
+  purchaseCosmetic: async (cosmeticId: string, cost: number) => {
+    const state = get();
+    if (state.persistentMastery.blueprints < cost) return false;
+    if (state.persistentMastery.unlockedCosmetics.includes(cosmeticId)) return false;
+    
+    const newMastery = { ...state.persistentMastery };
+    newMastery.blueprints -= cost;
+    newMastery.unlockedCosmetics = [...newMastery.unlockedCosmetics, cosmeticId];
+    
+    await saveMasteryData(newMastery);
+    set({ persistentMastery: newMastery });
+    return true;
+  },
+  
+  purchaseTheme: async (themeId: string, cost: number) => {
+    const state = get();
+    if (state.persistentMastery.blueprints < cost) return false;
+    if (state.persistentMastery.unlockedThemes.includes(themeId)) return false;
+    
+    const newMastery = { ...state.persistentMastery };
+    newMastery.blueprints -= cost;
+    newMastery.unlockedThemes = [...newMastery.unlockedThemes, themeId];
+    
+    await saveMasteryData(newMastery);
+    set({ persistentMastery: newMastery });
+    return true;
+  },
+  
+  selectSkin: async (skinId: string) => {
+    const state = get();
+    if (!state.persistentMastery.unlockedCosmetics.includes(skinId)) return;
+    
+    const newMastery = { ...state.persistentMastery, selectedSkin: skinId };
+    await saveMasteryData(newMastery);
+    set({ persistentMastery: newMastery });
+  },
+  
+  selectTheme: async (themeId: string) => {
+    const state = get();
+    if (!state.persistentMastery.unlockedThemes.includes(themeId)) return;
+    
+    const newMastery = { ...state.persistentMastery, selectedTheme: themeId };
+    await saveMasteryData(newMastery);
+    set({ persistentMastery: newMastery });
   },
 }));
