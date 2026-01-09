@@ -267,11 +267,19 @@ export function generateSkinVariations(prompt: string, count: number = 3): SkinR
 
 export async function saveForgedSkin(recipe: SkinRecipe): Promise<void> {
   try {
+    console.log('[skinForge] Saving skin:', recipe.id);
     const existing = await loadForgedSkins();
+    console.log('[skinForge] Existing skins:', existing.length);
     const updated = [...existing.filter(s => s.id !== recipe.id), recipe];
     await AsyncStorage.setItem(FORGE_STORAGE_KEY, JSON.stringify(updated));
+    console.log('[skinForge] Saved! Total skins now:', updated.length);
+    
+    // Verify save worked
+    const verify = await AsyncStorage.getItem(FORGE_STORAGE_KEY);
+    console.log('[skinForge] Verify saved data length:', verify?.length || 0);
   } catch (error) {
     console.error('Failed to save forged skin:', error);
+    throw error;
   }
 }
 
