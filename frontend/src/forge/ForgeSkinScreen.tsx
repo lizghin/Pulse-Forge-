@@ -282,21 +282,21 @@ export function ForgeSkinScreen({ onBack, onSkinCreated }: ForgeSkinScreenProps)
             {/* Action Buttons */}
             {selectedIndex !== null && (
               <View style={styles.actionButtons}>
-                <TouchableOpacity
+                <Pressable
                   style={styles.useSkinButton}
                   onPress={handleUseSkin}
                 >
                   <Ionicons name="checkmark-circle" size={20} color="#0a0a1a" />
                   <Text style={styles.useSkinText}>USE THIS SKIN</Text>
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                   style={styles.mintButton}
                   onPress={handleMintNFT}
                 >
                   <Ionicons name="diamond" size={18} color="#ffaa00" />
                   <Text style={styles.mintText}>MINT NFT</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             )}
 
