@@ -127,7 +127,7 @@ export function endRun(): void {
 // Track event
 export async function track(event: AnalyticsEvent): Promise<void> {
   if (!playerId || !sessionId) {
-    console.warn('[Analytics] Not initialized, skipping event');
+    console.warn('[Analytics] Not initialized, skipping event:', event.type);
     return;
   }
   
@@ -147,10 +147,11 @@ export async function track(event: AnalyticsEvent): Promise<void> {
     queue.push(queuedEvent);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
     
-    console.log('[Analytics] Queued:', event.type, 'Queue size:', queue.length);
+    console.log('[Analytics] Queued event:', event.type, '| Queue size:', queue.length);
     
     // Flush if batch size reached
     if (queue.length >= BATCH_SIZE) {
+      console.log('[Analytics] Batch size reached, triggering flush');
       await flushQueue();
     }
   } catch (error) {
