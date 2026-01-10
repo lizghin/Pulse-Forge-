@@ -172,11 +172,16 @@ async function getQueue(): Promise<QueuedEvent[]> {
 export async function flushQueue(): Promise<void> {
   try {
     const queue = await getQueue();
-    if (queue.length === 0) return;
+    if (queue.length === 0) {
+      console.log('[Analytics] Queue empty, nothing to flush');
+      return;
+    }
     
-    console.log('[Analytics] Flushing', queue.length, 'events');
+    const url = `${API_URL}/api/analytics/events/batch`;
+    console.log('[Analytics] Flushing', queue.length, 'events to:', url);
+    console.log('[Analytics] First event:', JSON.stringify(queue[0]?.event));
     
-    const response = await fetch(`${API_URL}/api/analytics/events/batch`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -188,9 +193,11 @@ export async function flushQueue(): Promise<void> {
     if (response.ok) {
       // Clear queue on success
       await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify([]));
-      console.log('[Analytics] Flush successful');
+      const result = await response.json();
+      console.log('[Analytics] Flush successful:', result);
     } else {
-      console.error('[Analytics] Flush failed:', response.status);
+      const errorText = await response.text();
+      console.error('[Analytics] Flush failed:', response.status, errorText);
     }
   } catch (error) {
     console.error('[Analytics] Flush error:', error);
