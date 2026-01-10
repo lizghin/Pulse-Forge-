@@ -1,8 +1,9 @@
 // Analytics Module - Minimal instrumentation for gameplay tuning
+// Uses expo-constants for version info (web-compatible)
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 
 // Types
 export interface RunEndEvent {
@@ -65,9 +66,21 @@ function generateUUID(): string {
   });
 }
 
-// Get app version
+// Get app version from expo-constants (web-safe)
 function getAppVersion(): string {
-  return Application.nativeApplicationVersion || '1.0.0';
+  try {
+    // Try expoConfig first (works on all platforms)
+    const version = Constants.expoConfig?.version;
+    if (version) return version;
+    
+    // Fallback to manifest (older expo versions)
+    const manifest = Constants.manifest;
+    if (manifest?.version) return manifest.version;
+    
+    return 'dev';
+  } catch {
+    return 'dev';
+  }
 }
 
 // Get platform
@@ -93,7 +106,7 @@ export async function initAnalytics(): Promise<void> {
     if (flushTimer) clearInterval(flushTimer);
     flushTimer = setInterval(flushQueue, FLUSH_INTERVAL);
     
-    console.log('[Analytics] Initialized. Player:', playerId?.slice(0, 8));
+    console.log('[Analytics] Initialized. Player:', playerId?.slice(0, 8), 'Version:', getAppVersion());
   } catch (error) {
     console.error('[Analytics] Init error:', error);
   }
