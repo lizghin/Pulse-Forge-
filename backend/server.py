@@ -69,8 +69,10 @@ set_analytics_db(analytics_db)
 set_simple_db(db)  # Simple analytics uses same db
 
 # Include analytics routers
-api_router.include_router(analytics_router)
+# Simple router first - it handles MVP dashboard events
 api_router.include_router(simple_analytics_router)
+# Complex router with different prefix for advanced analytics
+api_router.include_router(analytics_router, prefix="/advanced")
 
 # Include the main router in the app
 app.include_router(api_router)
