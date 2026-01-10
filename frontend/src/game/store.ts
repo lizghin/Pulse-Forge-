@@ -312,18 +312,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Calculate Blueprints
     const rewards = calculateRunBlueprints(state.score, state.masteryStats);
     
-    // Track run end analytics
-    Analytics.trackRunEnd({
-      score: state.score,
-      duration: Math.floor(state.maxTime - state.timer),
-      segment_reached: Math.floor((state.maxTime - state.timer) / 15) + 1,
-      death_cause: state.hp <= 0 ? 'collision' : null,
-      perfect_count: state.perfectPulses,
-      near_miss_count: state.masteryStats.nearMisses,
-      blueprints_earned_total: rewards.totalBlueprints,
-    });
-    Analytics.endRun();
-    Analytics.flush();
+    // Determine death cause based on phase
+    // If timer ran out, no death cause; if died early, it was collision
+    const duration = Math.floor(state.maxTime - state.timer);
+    const deathCause = duration < state.maxTime ? 'collision' : null;
+    
+    // Track run end analytics (single call)
+    try {
+      await Analytics.trackRunEnd({
+        score: state.score,
+        duration: duration,
+        segment_reached: Math.floor(duration / 15) + 1,
+        death_cause: deathCause,
+        perfect_count: state.perfectPulses,
+        near_miss_count: state.masteryStats.nearMisses,
+        blueprints_earned_total: rewards.totalBlueprints,
+      });
+      Analytics.endRun();
+      await Analytics.flush();
+      console.log('[Store] Analytics run_end tracked and flushed');
+    } catch (err) {
+      console.error('[Store] Analytics tracking error:', err);
+    }
     
     // Update persistent mastery
     const newMastery = { ...state.persistentMastery };
@@ -337,20 +347,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Check for new mastery unlocks
     const unlocks = checkMasteryUnlocks(newMastery);
     newMastery.unlockedUpgrades = [...newMastery.unlockedUpgrades, ...unlocks];
-    
-    // Track run end analytics
-    Analytics.trackRunEnd({
-      score: state.score,
-      duration: state.maxTime - state.timer,
-      segment_reached: Math.floor(state.distance / 100),
-      death_cause: state.phase === 'ended' ? 'collision' : null,
-      perfect_count: state.perfectPulses,
-      near_miss_count: state.masteryStats.nearMisses,
-      blueprints_earned_total: rewards.totalBlueprints,
-    });
-    
-    // End analytics run
-    Analytics.endRun();
     
     // Save to storage
     await saveMasteryData(newMastery);
