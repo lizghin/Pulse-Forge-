@@ -49,7 +49,7 @@ const PLAYER_ID_KEY = '@pulse_forge_player_id';
 const BATCH_SIZE = 10;
 const FLUSH_INTERVAL = 30000; // 30 seconds
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
-const INGESTION_KEY = 'pulse-forge-ingest-key-2024';
+const INGESTION_KEY = 'pulse-forge-ingest-2024';
 
 // State
 let playerId: string | null = null;
