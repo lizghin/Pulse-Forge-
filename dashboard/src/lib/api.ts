@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// Dashboard runs on its own port so needs full backend URL
+const API_BASE = 'http://localhost:8001';
 const DASHBOARD_KEY = 'pulse-forge-dashboard-2024';
 
 export async function fetchDashboardStats(
