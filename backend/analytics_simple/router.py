@@ -103,6 +103,7 @@ async def ingest_events(
             'ts': datetime.fromisoformat(item.ts.replace('Z', '+00:00')),
             'app_version': item.app_version,
             'platform': item.platform,
+            'is_demo': False,  # Real events are not demo
         }
         
         if event_type == 'run_end':
@@ -160,6 +161,7 @@ async def get_dashboard_stats(
     days: int = Query(7, ge=1, le=90),
     app_version: Optional[str] = None,
     platform: Optional[str] = None,
+    hide_demo: bool = Query(True, description="Hide demo data"),
     api_key: str = Depends(verify_dashboard_key)
 ):
     """Get all dashboard statistics"""
@@ -172,6 +174,8 @@ async def get_dashboard_stats(
         match['app_version'] = app_version
     if platform:
         match['platform'] = platform
+    if hide_demo:
+        match['is_demo'] = {'$ne': True}  # Exclude demo data
     
     # Death causes breakdown
     death_pipeline = [
@@ -231,17 +235,19 @@ async def get_dashboard_stats(
     except:
         blueprints = []
     
-    # Recent runs
+    # Recent runs - sorted by ts DESC (numeric)
     recent_runs = await db.analytics_runs.find(match).sort('ts', -1).limit(50).to_list(50)
     for run in recent_runs:
         run['_id'] = str(run['_id'])
         run['ts'] = run['ts'].isoformat() if run.get('ts') else None
+        run['is_demo'] = run.get('is_demo', False)
     
-    # Recent purchases
+    # Recent purchases - sorted by ts DESC
     recent_purchases = await db.analytics_economy_events.find(match).sort('ts', -1).limit(20).to_list(20)
     for p in recent_purchases:
         p['_id'] = str(p['_id'])
         p['ts'] = p['ts'].isoformat() if p.get('ts') else None
+        p['is_demo'] = p.get('is_demo', False)
     
     # Summary stats
     total_runs = await db.analytics_runs.count_documents(match)
@@ -294,6 +300,7 @@ async def export_runs_csv(
     days: int = Query(7, ge=1, le=90),
     app_version: Optional[str] = None,
     platform: Optional[str] = None,
+    hide_demo: bool = Query(True),
     api_key: str = Depends(verify_dashboard_key)
 ):
     """Export runs as CSV"""
@@ -305,6 +312,8 @@ async def export_runs_csv(
         match['app_version'] = app_version
     if platform:
         match['platform'] = platform
+    if hide_demo:
+        match['is_demo'] = {'$ne': True}
     
     runs = await db.analytics_runs.find(match).sort('ts', -1).limit(5000).to_list(5000)
     
@@ -318,7 +327,7 @@ async def export_runs_csv(
     output = io.StringIO()
     fieldnames = ['run_id', 'player_id', 'ts', 'app_version', 'platform', 'score', 
                   'duration', 'segment_reached', 'death_cause', 'perfect_count', 
-                  'near_miss_count', 'blueprints_earned_total']
+                  'near_miss_count', 'blueprints_earned_total', 'is_demo']
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
     writer.writeheader()
     
@@ -411,6 +420,7 @@ async def generate_demo_data(
                 'perfect_count': perfect,
                 'near_miss_count': near_miss,
                 'blueprints_earned_total': bp_earned,
+                'is_demo': True,  # Mark as demo data
             })
             
             # Simulate upgrades picked (3-6 per run)
@@ -426,6 +436,7 @@ async def generate_demo_data(
                     'upgrade_id': upg[0],
                     'rarity': upg[1],
                     'category': upg[2],
+                    'is_demo': True,  # Mark as demo data
                 })
             
             # Simulate purchases (10% chance)
@@ -441,6 +452,7 @@ async def generate_demo_data(
                     'item_type': item[0],
                     'item_id': item[1],
                     'cost': item[2],
+                    'is_demo': True,  # Mark as demo data
                 })
     
     # Insert all
@@ -463,7 +475,28 @@ async def generate_demo_data(
 
 @simple_analytics_router.delete("/demo/clear")
 async def clear_demo_data(api_key: str = Depends(verify_dashboard_key)):
-    """Clear all analytics data"""
+    """Clear only demo analytics data (preserves real data)"""
+    db = get_db()
+    
+    # Only delete demo data
+    runs_result = await db.analytics_runs.delete_many({'is_demo': True})
+    upgrades_result = await db.analytics_upgrade_picks.delete_many({'is_demo': True})
+    economy_result = await db.analytics_economy_events.delete_many({'is_demo': True})
+    
+    return {
+        'success': True,
+        'deleted': {
+            'runs': runs_result.deleted_count,
+            'upgrades': upgrades_result.deleted_count,
+            'economy': economy_result.deleted_count,
+        },
+        'message': 'Demo data cleared (real data preserved)'
+    }
+
+
+@simple_analytics_router.delete("/all/clear")
+async def clear_all_data(api_key: str = Depends(verify_dashboard_key)):
+    """Clear ALL analytics data (use with caution)"""
     db = get_db()
     
     await db.analytics_runs.delete_many({})

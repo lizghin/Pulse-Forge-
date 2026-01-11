@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -40,7 +41,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 import {
   Download,
@@ -52,21 +52,37 @@ import {
   TrendingUp,
   Database,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 const COLORS = ["#00ff88", "#ff4444", "#ffaa00", "#00d4ff", "#ff00ff", "#8800ff"];
+
+function formatTime(ts: string | null): { display: string; relative: string } {
+  if (!ts) return { display: "N/A", relative: "" };
+  try {
+    const date = new Date(ts);
+    return {
+      display: format(date, "MMM d HH:mm"),
+      relative: formatDistanceToNow(date, { addSuffix: true }),
+    };
+  } catch {
+    return { display: "N/A", relative: "" };
+  }
+}
 
 export default function Dashboard() {
   const [days, setDays] = useState(7);
   const [appVersion, setAppVersion] = useState<string | undefined>();
   const [platform, setPlatform] = useState<string | undefined>();
+  const [hideDemo, setHideDemo] = useState(true);
 
   const queryClient = useQueryClient();
 
   const { data: stats, isLoading, refetch } = useQuery({
-    queryKey: ["dashboard-stats", days, appVersion, platform],
-    queryFn: () => fetchDashboardStats(days, appVersion, platform),
+    queryKey: ["dashboard-stats", days, appVersion, platform, hideDemo],
+    queryFn: () => fetchDashboardStats(days, appVersion, platform, hideDemo),
   });
 
   const { data: filters } = useQuery({
@@ -91,7 +107,7 @@ export default function Dashboard() {
   });
 
   const handleExport = () => {
-    const url = getExportUrl(days, appVersion, platform);
+    const url = getExportUrl(days, appVersion, platform, hideDemo);
     window.open(url, "_blank");
   };
 
@@ -122,7 +138,7 @@ export default function Dashboard() {
             className="bg-[#1a1a2e] border-[#333] hover:bg-[#2a2a4e] text-red-400"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Clear
+            Clear Demo
           </Button>
         </div>
       </div>
@@ -155,7 +171,7 @@ export default function Dashboard() {
             </SelectTrigger>
             <SelectContent className="bg-[#1a1a2e] border-[#333]">
               <SelectItem value="all">All</SelectItem>
-              {filters?.app_versions.map((v) => (
+              {filters?.app_versions.map((v: string) => (
                 <SelectItem key={v} value={v}>
                   {v}
                 </SelectItem>
@@ -175,13 +191,31 @@ export default function Dashboard() {
             </SelectTrigger>
             <SelectContent className="bg-[#1a1a2e] border-[#333]">
               <SelectItem value="all">All</SelectItem>
-              {filters?.platforms.map((p) => (
+              {filters?.platforms.map((p: string) => (
                 <SelectItem key={p} value={p}>
                   {p}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Hide Demo Toggle */}
+        <div className="flex items-center gap-2 ml-4 pl-4 border-l border-[#333]">
+          {hideDemo ? (
+            <EyeOff className="h-4 w-4 text-gray-400" />
+          ) : (
+            <Eye className="h-4 w-4 text-purple-400" />
+          )}
+          <Label htmlFor="hide-demo" className="text-sm text-gray-400 cursor-pointer">
+            Hide demo
+          </Label>
+          <Switch
+            id="hide-demo"
+            checked={hideDemo}
+            onCheckedChange={setHideDemo}
+            className="data-[state=checked]:bg-[#00ff88]"
+          />
         </div>
 
         <div className="flex-1" />
@@ -288,7 +322,7 @@ export default function Dashboard() {
                         `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`
                       }
                     >
-                      {stats?.death_causes.map((_, index) => (
+                      {stats?.death_causes.map((_: any, index: number) => (
                         <Cell key={index} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -406,7 +440,7 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stats?.upgrade_picks.slice(0, 10).map((u, i) => (
+                    {stats?.upgrade_picks.slice(0, 10).map((u: any, i: number) => (
                       <TableRow key={i} className="border-[#333]">
                         <TableCell className="font-medium">{u.upgrade_id}</TableCell>
                         <TableCell>
@@ -453,34 +487,53 @@ export default function Dashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats?.recent_runs.slice(0, 15).map((run) => (
-                        <TableRow key={run._id} className="border-[#333]">
-                          <TableCell className="text-gray-400 text-sm">
-                            {run.ts ? format(new Date(run.ts), "MMM d HH:mm") : "N/A"}
+                      {stats?.recent_runs.length === 0 ? (
+                        <TableRow className="border-[#333]">
+                          <TableCell colSpan={5} className="text-center text-gray-500">
+                            No runs yet
                           </TableCell>
-                          <TableCell className="font-mono text-[#00ff88]">
-                            {run.score}
-                          </TableCell>
-                          <TableCell className="font-mono">{run.duration}s</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                run.death_cause === "wall"
-                                  ? "border-red-500 text-red-400"
-                                  : run.death_cause === "drone"
-                                  ? "border-orange-500 text-orange-400"
-                                  : run.death_cause === "laser"
-                                  ? "border-yellow-500 text-yellow-400"
-                                  : "border-gray-500 text-gray-400"
-                              }
-                            >
-                              {run.death_cause || "survived"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-400">{run.platform}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        stats?.recent_runs.slice(0, 15).map((run: any) => {
+                          const time = formatTime(run.ts);
+                          return (
+                            <TableRow key={run._id} className="border-[#333]">
+                              <TableCell className="text-sm">
+                                <div className="text-gray-300">{time.display}</div>
+                                <div className="text-xs text-gray-500">{time.relative}</div>
+                              </TableCell>
+                              <TableCell className="font-mono text-[#00ff88]">
+                                {run.score}
+                                {run.is_demo && (
+                                  <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-purple-500 text-purple-400">
+                                    DEMO
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-mono">{run.duration}s</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    run.death_cause === "wall"
+                                      ? "border-red-500 text-red-400"
+                                      : run.death_cause === "drone"
+                                      ? "border-orange-500 text-orange-400"
+                                      : run.death_cause === "laser"
+                                      ? "border-yellow-500 text-yellow-400"
+                                      : run.death_cause === "collision"
+                                      ? "border-pink-500 text-pink-400"
+                                      : "border-gray-500 text-gray-400"
+                                  }
+                                >
+                                  {run.death_cause || "survived"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-gray-400">{run.platform}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -511,29 +564,40 @@ export default function Dashboard() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        stats?.recent_purchases.map((p) => (
-                          <TableRow key={p._id} className="border-[#333]">
-                            <TableCell className="text-gray-400 text-sm">
-                              {p.ts ? format(new Date(p.ts), "MMM d HH:mm") : "N/A"}
-                            </TableCell>
-                            <TableCell className="font-medium">{p.item_id}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  p.item_type === "cosmetic"
-                                    ? "border-purple-500 text-purple-400"
-                                    : "border-blue-500 text-blue-400"
-                                }
-                              >
-                                {p.item_type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-[#ffaa00]">
-                              {p.cost} BP
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        stats?.recent_purchases.map((p: any) => {
+                          const time = formatTime(p.ts);
+                          return (
+                            <TableRow key={p._id} className="border-[#333]">
+                              <TableCell className="text-sm">
+                                <div className="text-gray-300">{time.display}</div>
+                                <div className="text-xs text-gray-500">{time.relative}</div>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {p.item_id}
+                                {p.is_demo && (
+                                  <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-purple-500 text-purple-400">
+                                    DEMO
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    p.item_type === "cosmetic"
+                                      ? "border-purple-500 text-purple-400"
+                                      : "border-blue-500 text-blue-400"
+                                  }
+                                >
+                                  {p.item_type}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-[#ffaa00]">
+                                {p.cost} BP
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
